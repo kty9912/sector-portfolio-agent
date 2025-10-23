@@ -16,7 +16,9 @@ dependencies = [
     "langchain",
     "langchain-openai",
     "langchain-community",
-    "firecrawl-py"
+    "firecrawl-py",
+    "qdrant-client",
+    "sentence-transformers"
 ]
 
 # 3. 개발용/선택적 의존성 (테스트, 린팅 등)
