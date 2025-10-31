@@ -27,3 +27,8 @@ dev = [
     "pytest",  # 나중에 테스트 코드를 만들 때 사용
     "ruff"     # 초고속 파이썬 린터 (VSCode 확장과 연동하면 최고)
 ]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]
