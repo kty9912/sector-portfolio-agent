@@ -1,3 +1,6 @@
+# python -m experiments.test_llm_factory
+# 스크립트가 아닌 모듈로 실행하기 위해 위 명령어를 사용해야 함
+
 import os
 from dotenv import load_dotenv
 

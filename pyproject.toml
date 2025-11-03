@@ -19,6 +19,8 @@ dependencies = [
     "firecrawl-py",
     "qdrant-client",
     "sentence-transformers"
+    "langgraph",         
+    "langchain_core"
 ]
 
 # 3. 개발용/선택적 의존성 (테스트, 린팅 등)
