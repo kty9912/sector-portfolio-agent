@@ -18,7 +18,7 @@ dependencies = [
     "langchain-community",
     "firecrawl-py",
     "qdrant-client",
-    "sentence-transformers"
+    "sentence-transformers",
     "langgraph",         
     "langchain_core"
 ]
