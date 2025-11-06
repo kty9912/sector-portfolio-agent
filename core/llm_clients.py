@@ -1,5 +1,6 @@
 import os
 from langchain_core.language_models import BaseChatModel
+from typing import List, Dict
 
 # --- .env 파일에서 LLM 공급자별 API 키와 모델 이름을 "미리" 읽어옵니다. ---
 # (main.py에서 load_dotenv()를 실행한 *이후*에 이 파일이 임포트되어야 합니다.)
