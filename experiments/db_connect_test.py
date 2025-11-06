@@ -26,6 +26,9 @@ TICKERS = [
 START = (date.today() - timedelta(days=365*2)).isoformat()  # 최근 2년
 END   = None  # 오늘까지
 
+print('start :', START)
+print('end :', END)
+
 def get_conn():
     return psycopg2.connect(**DB)
 
