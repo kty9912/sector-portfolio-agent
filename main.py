@@ -3,29 +3,31 @@ from fastapi import FastAPI, Query, HTTPException, Request
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any
+# --- [Main] 핵심 모듈 임포트 ---
+# .env 로드 이후에 임포트해야, 이 모듈들이 API 키를 올바르게 읽을 수 있습니다.
+from langchain_core.messages import HumanMessage # HumanMessage 임포트 추가
 
 # --- [Main] .env 파일 로드 (가장 먼저 실행!) ---
 # 'core'나 'agents' 모듈이 임포트되기 *전에* .env를 로드해야 합니다.
 load_dotenv()
 print("--- [Main] .env 파일 로드 완료 ---")
 
-# --- [Main] 핵심 모듈 임포트 ---
-# .env 로드 이후에 임포트해야, 이 모듈들이 API 키를 올바르게 읽을 수 있습니다.
-from langchain_core.messages import HumanMessage # HumanMessage 임포트 추가
+
 try:
     # 이 임포트가 성공하려면, 
     # 1. 'core/graph_builder.py' 파일이 완전해야 하고
     # 2. 'core/llm_clients.py' 파일이 완전해야 합니다.
-    from core.graph_builder import compiled_engine_map
+    from core.graph_builder import compiled_engine_map, AgentState
     from core.llm_clients import AVAILABLE_MODELS
 except ImportError as e:
     print("\n==================================================")
     print(f"!!! 핵심 모듈 임포트 실패: {e}")
-    print("!!! 'core/graph_builder.py' 또는 'core/llm_clients.py' 파일에 문제가 없는지 확인하세요.")
     print("!!! (uv sync --extra dev를 실행했는지도 확인하세요)")
     print("==================================================")
     compiled_engine_map = {} # 서버가 일단 켜지도록 비워둡니다.
     AVAILABLE_MODELS = [] # 서버가 일단 켜지도록 비워둡니다.
+    class AgentState(dict): pass
+    class HumanMessage: pass
 except Exception as e:
     print(f"\n!!! 알 수 없는 임포트 에러 발생: {e}")
     compiled_engine_map = {}
@@ -105,13 +107,19 @@ async def generate_portfolio_v1(
         initial_state = {
             "sector_name": sector_name,
             "messages": [HumanMessage(content=f"'{sector_name}' 섹터를 분석해줘.")],
-            "iteration_count": 0
+            "iteration_count": 0,
+            "momentum_result": {},
+            "realtime_news_result": [],
+            "historical_news_result": {},
+            "final_report": ""
         }
         
         # .ainvoke()는 최종 상태(final_state)를 반환합니다.
+        print(f"--- [FastAPI] LangGraph '{model}' 엔진 실행 시작... ---")
         final_state = await compiled_engine.ainvoke(initial_state)
         
         # 4. 최종 결과 반환
+        print(f"--- [FastAPI] LangGraph 엔진 실행 완료 ---")
         report = final_state.get("final_report", "오류: 최종 보고서를 생성하지 못했습니다.")
         print(f"  > 분석 완료. 보고서 반환.")
         return {"sector": sector_name, "model": model, "final_report": report}

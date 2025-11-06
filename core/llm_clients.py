@@ -1,5 +1,6 @@
 import os
-from langchain_core.chat_models import BaseChatModel
+from langchain_core.language_models import BaseChatModel
+from typing import List, Dict
 
 # --- .env 파일에서 LLM 공급자별 API 키와 모델 이름을 "미리" 읽어옵니다. ---
 # (main.py에서 load_dotenv()를 실행한 *이후*에 이 파일이 임포트되어야 합니다.)
@@ -7,18 +8,27 @@ from langchain_core.chat_models import BaseChatModel
 # 1. Upstage
 UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY")
 UPSTAGE_MODEL_NAME = os.getenv("LLM_PROVIDER_UPSTAGE_MODEL", "solar-pro2") 
+print(f"[DEBUG] UPSTAGE_API_KEY loaded: {bool(UPSTAGE_API_KEY)}")
+print(f"[DEBUG] UPSTAGE_MODEL_NAME: {UPSTAGE_MODEL_NAME}")
 
 # 2. OpenAI (새로 추가!)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL_NAME = os.getenv("LLM_PROVIDER_OPENAI_MODEL", "gpt-4o-mini")
+print(f"[DEBUG] OPENAI_API_KEY loaded: {bool(OPENAI_API_KEY)}")
+print(f"[DEBUG] OPENAI_MODEL_NAME: {OPENAI_MODEL_NAME}")
 
-# 3. Google Gemini
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GEMINI_MODEL_NAME = os.getenv("LLM_PROVIDER_GEMINI_MODEL", "gemini-1.5-pro")
+# 3. Google Gemini (사용 안함)
+# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# GEMINI_MODEL_NAME = os.getenv("LLM_PROVIDER_GEMINI_MODEL", "gemini-1.5-pro")
+GOOGLE_API_KEY = None
+GEMINI_MODEL_NAME = "gemini-1.5-pro"
 
-# 4. Groq
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL_NAME = os.getenv("LLM_PROVIDER_GROQ_MODEL", "llama3-8b-8192")
+
+# 4. Groq (사용 안함)
+# GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# GROQ_MODEL_NAME = os.getenv("LLM_PROVIDER_GROQ_MODEL", "llama3-8b-8192")
+GROQ_API_KEY = None
+GROQ_MODEL_NAME = "llama3-8b-8192"
 
 
 # --- 사용 가능한 모델의 "전체 목록" ---
@@ -44,6 +54,7 @@ def get_chat_model(model_name: str) -> BaseChatModel:
     LLM 팩토리: .env 파일과 모델 이름을 기반으로
     올바른 LLM 클라이언트(Upstage, OpenAI, Gemini 등)를 반환합니다.
     """
+    print(f"[DEBUG] get_chat_model called with model_name: '{model_name}'")
     
     # --- 각 모델에 대한 클라이언트 생성 로직 ---
     # (API 키가 있는 모델만 실제로 생성됩니다.)

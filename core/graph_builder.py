@@ -2,7 +2,6 @@ import os
 import operator
 from typing import TypedDict, Annotated, List, Dict, Any
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
-from langchain_core.tools import tool
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
@@ -18,7 +17,8 @@ class AgentState(TypedDict):
     iteration_count: int # 7회 루프 제한을 위한 카운터
     # 툴 실행 결과를 저장할 '빈 상자'들
     momentum_result: dict
-    news_rag_result: dict
+    realtime_news_result: List[Dict] # Tavily 결과
+    historical_news_result: dict      # Qdrant/Firecrawl 결과
     # 최종 결과물
     final_report: str
 
@@ -49,23 +49,46 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
         prompt = f"""
         당신은 7단계(max_iterations) 안에 임무를 완수해야 하는 금융 분석 코디네이터입니다.
         현재 {state['iteration_count']}번째 단계입니다. 남은 단계: {recursion_limit - state['iteration_count']}
-        
-        지금까지의 대화 기록:
-        {state['messages']}
+        사용자가 요청한 섹터: '{state['sector_name']}'
+        지금까지의 대화 기록:  {state['messages']}
         
         수집된 데이터 현황:
         - 모멘텀 분석: {state.get('momentum_result', '아직 분석 안됨')}
-        - 뉴스 RAG 분석: {state.get('news_rag_result', '아직 분석 안됨')}
+        - 실시간 뉴스 (Tavily): {state.get('realtime_news_result', '아직 분석 안됨')}
+        - 과거/심층 뉴스 (Qdrant): {state.get('historical_news_result', '아직 분석 안됨')}
 
         다음 행동을 결정하세요.
-        1. 만약 '모멘텀 분석'과 '뉴스 RAG 분석'이 *모두* 완료되었다면, 'report_generator_node'를 호출하여 최종 보고서를 작성하세요.
-        2. 만약 분석이 덜 끝났다면, 필요한 툴(get_sector_etf_momentum, search_sector_news_rag)을 호출하세요.
-        3. 7단계를 초과할 것 같으면, 현재까지의 정보로 'report_generator_node'를 호출하세요.
+        1. 만약 *모든* 데이터 (모멘텀, Tavily, Qdrant)가 수집되었다면, 'report_generator_node'를 호출하세요.
+        2. 만약 데이터가 덜 끝났다면, 필요한 툴을 *모두* 호출하세요.
+           (예: 'get_sector_etf_momentum', 'search_realtime_news_tavily', 'ingest_and_search_qdrant' 툴)
         """
         
-        # LLM이 툴을 호출할지, 그냥 말할지 결정
-        response = llm_with_tools.invoke([HumanMessage(content=prompt)])
-        return {"messages": [response]}
+        # Tavily 검색 쿼리를 더 구체적으로 만듭니다.
+        tavily_query = f"{state['sector_name']} sector latest news summary"
+        qdrant_query = state['sector_name']
+
+        # [업그레이드] 3개의 툴을 모두 호출하도록 프롬프트 구성
+        # (더 나은 방식은 LLM이 스스로 판단하게 하는 것이지만, MVP는 명시적으로 호출)
+        initial_prompt = f"""
+        '{state['sector_name']}' 섹터 분석을 시작합니다.
+        아래 3개의 툴을 *모두* 호출하여 데이터를 수집하세요:
+        1. get_sector_etf_momentum(sector_name="{state['sector_name']}")
+        2. search_realtime_news_tavily(query="{tavily_query}")
+        3. ingest_and_search_qdrant(sector_name="{qdrant_query}")
+        
+        모든 툴 호출이 끝나면, 수집된 정보로 보고서를 생성하세요.
+        """
+        
+        # 첫 번째 스텝에서는 3개의 툴을 모두 호출하도록 유도
+        if state['iteration_count'] == 1:
+            messages = [HumanMessage(content=initial_prompt)]
+        else:
+            messages = state['messages'] + [HumanMessage(content=prompt)]
+
+        response = llm_with_tools.invoke(messages)
+        # Persist the updated iteration count so LangGraph will update AgentState
+        # (fixes the "memory loss" bug where iteration_count was not returned)
+        return {"messages": [response], "iteration_count": state['iteration_count']}
 
     # (Agent 2, 5 등)
     # 실제 툴을 실행하는 노드
@@ -76,12 +99,17 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
         
         # tool_calls가 없는 경우 (LLM이 툴을 부르지 않음)
         if not last_message.tool_calls:
-            print("  > PM이 툴을 호출하지 않았습니다. (아마도 보고서 생성 결정)")
+            print("  > PM이 툴을 호출하지 않았습니다. (보고서 생성 단계로 이동)")
             return {} # 아무것도 안하고 다음 단계로 (라우터가 처리)
 
         tool_calls = last_message.tool_calls
-        
         tool_messages = []
+
+        # [업그레이드] 툴 실행 결과를 AgentState에 명시적으로 저장
+        momentum_result = state.get("momentum_result")
+        realtime_news_result = state.get("realtime_news_result")
+        historical_news_result = state.get("historical_news_result")
+
         for call in tool_calls:
             tool_name = call["name"]
             tool_args = call["args"]
@@ -97,13 +125,16 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
                         
                         # 툴 실행 결과를 AgentState의 올바른 '상자'에 저장
                         if tool_name == "get_sector_etf_momentum":
-                            state["momentum_result"] = result
-                        elif tool_name == "search_sector_news_rag":
-                            state["news_rag_result"] = result
+                            momentum_result = result
+                        elif tool_name == "search_realtime_news_tavily":
+                            realtime_news_result = result
+                        elif tool_name == "ingest_and_search_qdrant":
+                            historical_news_result = result
                             
                         tool_messages.append(ToolMessage(content=str(result), tool_call_id=call["id"]))
                         found_tool = True
                         break
+
                     except Exception as e:
                         print(f"  > Tool Execution Error: {e}")
                         tool_messages.append(ToolMessage(content=f"Error: {e}", tool_call_id=call["id"]))
@@ -112,39 +143,53 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
                 print(f"  > Tool Not Found Error: {tool_name}")
                 tool_messages.append(ToolMessage(content=f"Error: Tool '{tool_name}' not found.", tool_call_id=call["id"]))
 
-        return {"messages": tool_messages}
-
+        # [업그레이드] 툴 실행 결과를 'messages'와 'AgentState'에 모두 업데이트
+        return {
+            "messages": tool_messages,
+            "momentum_result": momentum_result,
+            "realtime_news_result": realtime_news_result,
+            "historical_news_result": historical_news_result
+        }
+    
     # (Agent 7: 보고서 생성기 역할)
     def report_generator_node(state: AgentState):
         print(f"\n--- [Graph] Node: Report Generator (Step {state['iteration_count']}) ---")
         
+        # AgentState에서 최종 데이터를 가져옴
         momentum = state.get("momentum_result", "데이터 없음")
-        news = state.get("news_rag_result", "데이터 없음")
+        tavily_news = state.get("realtime_news_result", "데이터 없음")
+        qdrant_news = state.get("historical_news_result", "데이터 없음")
         
-        # Upstage('solar-pro2') 등 LLM에게 최종 보고서 작성을 요청
         prompt = f"""
         '{state['sector_name']}' 섹터에 대한 분석이 완료되었습니다.
-        아래 두 가지 핵심 데이터를 바탕으로, 3~4문장의 전문적인 투자 분석 요약 보고서를 작성하세요.
+        아래 3가지 핵심 데이터를 바탕으로, 전문적인 투자 분석 요약 보고서를 작성하세요.
 
         1. 모멘텀 분석 (yfinance):
         {momentum}
 
-        2. 최신 뉴스 RAG 분석 (Qdrant):
-        {news}
+        2. 실시간 속보 (Tavily):
+        {tavily_news}
         
-        최종 보고서:
+        3. 과거/심층 뉴스 (Qdrant/Firecrawl):
+        {qdrant_news}
+        
+        [최종 보고서]
+        (3가지 데이터를 모두 종합하여 보고서 형식으로 요약)
         """
         
-        # 여기서는 툴이 아닌 순수 LLM을 호출하여 '글'을 생성합니다.
         response = llm.invoke(prompt) 
         report_text = response.content
         print(f"  > Final Report Generated: {report_text[:100]}...")
         
         return {"final_report": report_text}
 
+
     # --- 4. Graph Edges (엣지/경로) 정의 ---
-    
     def router_node(state: AgentState):
+        """
+        이 노드는 PM(Coordinator)의 마지막 메시지를 보고,
+        다음으로 '툴 실행'으로 갈지, '보고서 생성'으로 갈지 결정하는 '이정표'입니다.
+        """
         print(f"\n--- [Graph] Node: Router (Step {state['iteration_count']}) ---")
         
         # 1. 7회 루프 제한에 도달했는지 확인
@@ -154,11 +199,13 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
         
         # 2. PM(Coordinator)이 툴을 호출했는지, 아니면 그냥 말했는지 확인
         last_message = state["messages"][-1]
-        if last_message.tool_calls:
-            print("  > PM이 툴 호출 결정. 툴 실행으로 이동.")
+        if isinstance(last_message, ToolMessage) or (last_message.tool_calls):
+            # 툴 실행 결과를 바탕으로 PM(Coordinator)이 다시 생각해야 함
+            print("  > 툴 실행 완료. PM(Coordinator)이 다음 스텝 결정.")
             return "execute_tools"
         else:
-            print("  > PM이 툴 호출 안함 (또는 오류). 보고서 생성으로 이동.")
+            # PM이 툴 호출 없이 일반 텍스트로 응답 (보고서 생성 결정)
+            print("  > PM이 툴 호출 안함. 보고서 생성으로 이동.")
             return "generate_report"
 
     # --- 5. Graph Workflow (워크플로우) 정의 ---
@@ -168,18 +215,16 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
     workflow.add_node("coordinator", coordinator_node)
     workflow.add_node("tool_executor", tool_executor_node)
     workflow.add_node("report_generator", report_generator_node)
-    workflow.add_node("router_node", router_node) # 라우터 노드 추가
     
     # 5-2. 엣지(컨베이어 벨트) 연결
     workflow.set_entry_point("coordinator") # "PM 작업대"에서 시작
     
-    # "PM 작업대" 다음에는 항상 "라우터"로 가서 다음 경로를 결정
-    workflow.add_edge("coordinator", "router_node")
-    
-    # "라우터"의 결정에 따라 경로를 분기 (Conditional Edge)
+    # [업그레이드된 라우팅]
+    # 'coordinator'가 끝나면 'router_node'가 아니라,
+    # 'coordinator'가 툴을 불렀는지 아닌지를 'router_node' 함수로 판단
     workflow.add_conditional_edges(
-        "router_node", # 라우터 작업대에서
-        router_node,   # router_node 함수가 반환하는 "문자열"을 기반으로
+        "coordinator", # "PM 작업대"가 끝난 직후에
+        router_node,   # "router_node 함수"를 실행해서 (PM의 마지막 메시지를 보고)
         {
             # 만약 "execute_tools"를 반환하면 -> "tool_executor" 작업대로 감
             "execute_tools": "tool_executor",
@@ -198,7 +243,6 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
     app_engine = workflow.compile()
     return app_engine
 
-# --- (★ 여기가 빠졌던 핵심 코드입니다 ★) ---
 # --- [엔진 맵 빌더] ---
 # FastAPI가 시작될 때, 사용 가능한 모든 모델에 대해
 # LangGraph 엔진을 *미리* 컴파일해서 '지도(map)'에 저장해 둡니다.
@@ -225,5 +269,3 @@ for model_name in AVAILABLE_MODELS:
 
 print("--- [Graph] LangGraph 엔진 맵 컴파일 완료 ---")
 print(f"--- [Graph] 총 {len(compiled_engine_map)}개의 엔진이 준비되었습니다: {list(compiled_engine_map.keys())} ---")
-
-
