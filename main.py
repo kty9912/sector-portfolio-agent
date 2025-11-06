@@ -2,11 +2,11 @@ import uvicorn
 from fastapi import FastAPI
 from dotenv import load_dotenv
 
+load_dotenv()
+
 # 에이전트 모듈 임포트
 from agents.data_agent import get_sector_etf_momentum
 from agents.news_agent import analyze_sector_sentiment
-
-load_dotenv()
 
 app = FastAPI(
     title="Sector Portfolio Agent API",

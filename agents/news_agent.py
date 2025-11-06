@@ -1,6 +1,8 @@
 import os
 from openai import OpenAI
 
+print(os.environ.get("OPENAI_API_KEY"))
+
 # .env에서 API 키를 가져옴
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
