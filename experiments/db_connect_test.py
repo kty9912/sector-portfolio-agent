@@ -4,9 +4,9 @@ import pandas as pd
 import yfinance as yf
 from datetime import date, timedelta
 from dotenv import load_dotenv
+from core.db import fetch_all
 
 load_dotenv()
-
 
 DB = dict(
     host=os.getenv('DB_HOST'),
@@ -17,11 +17,7 @@ DB = dict(
 )
 
 # 화이트리스트(YF 티커)
-TICKERS = [
-    "005930.KS","000660.KS","012450.KS","068270.KS","042700.KS","017670.KS",
-    "034020.KS","051600.KS","298040.KS","010120.KS","009540.KS","079550.KS",
-    "207940.KS","196170.KQ"
-]
+TICKERS = [r[0] for r in fetch_all("SELECT ticker FROM companies WHERE is_active = TRUE ORDER BY ticker;")]
 
 START = (date.today() - timedelta(days=365*2)).isoformat()  # 최근 2년
 END   = None  # 오늘까지

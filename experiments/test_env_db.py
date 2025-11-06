@@ -15,4 +15,9 @@ VALUES ('hello','world')
 ON CONFLICT (k) DO UPDATE SET v=EXCLUDED.v;
 """)
 
-print(fetch_all("SELECT * FROM _env_check;"))
+ALTERS = ["ALTER TABLE prices_daily   ADD COLUMN IF NOT EXISTS etl_loaded_at TIMESTAMP DEFAULT NOW();"]
+
+if __name__ == "__main__":
+    for sql in ALTERS:
+        exec_sql(sql)
+    print("✅ timestamp 컬럼 추가 완료")

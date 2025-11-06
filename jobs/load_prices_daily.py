@@ -4,7 +4,7 @@ import pandas as pd
 import yfinance as yf
 from datetime import date, timedelta
 from pykrx import stock
-from core.db import exec_many, exec_sql
+from core.db import exec_many, exec_sql, fetch_all
 
 # ------------------------------
 #  환경 설정
@@ -15,43 +15,48 @@ os.environ.setdefault("REQUESTS_CA_BUNDLE", r"C:\certs\cacert.pem")
 os.environ.setdefault("CURL_CA_BUNDLE", r"C:\certs\cacert.pem")
 
 # 화이트리스트
-TICKERS = [
-    "005930.KS", "000660.KS", "012450.KS", "068270.KS", "042700.KS", "017670.KS",
-    "034020.KS", "051600.KS", "298040.KS", "010120.KS", "009540.KS", "079550.KS",
-    "207940.KS", "196170.KQ"
-]
+TICKERS = [r[0] for r in fetch_all("SELECT ticker FROM companies WHERE is_active = TRUE ORDER BY ticker;")]
 
 START = (date.today() - timedelta(days=365 * 2)).isoformat()
 END = None  # 오늘까지
 
-UPSERT_SQL = """
-INSERT INTO prices_daily (ticker, date, open, high, low, close, adj_close, volume)
-VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-ON CONFLICT (ticker, date) DO UPDATE SET
-    open=EXCLUDED.open,
-    high=EXCLUDED.high,
-    low=EXCLUDED.low,
-    close=EXCLUDED.close,
-    adj_close=EXCLUDED.adj_close,
-    volume=EXCLUDED.volume;
-"""
-
-CREATE_SQL = """
+# ------------------------------
+#  prices_daily 테이블 생성 (없으면)
+# ------------------------------
+CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS prices_daily (
-    ticker   TEXT NOT NULL,
-    date     DATE NOT NULL,
-    open     NUMERIC,
-    high     NUMERIC,
-    low      NUMERIC,
-    close    NUMERIC,
+    ticker TEXT NOT NULL,
+    date DATE NOT NULL,
+    open NUMERIC,
+    high NUMERIC,
+    low NUMERIC,
+    close NUMERIC,
     adj_close NUMERIC,
-    volume   BIGINT,
+    volume BIGINT,
+    etl_loaded_at TIMESTAMP DEFAULT NOW(),
     PRIMARY KEY (ticker, date)
 );
 """
 
+# ------------------------------
+#  업서트 쿼리 (etl_loaded_at 자동 갱신 포함)
+# ------------------------------
+UPSERT_SQL = """
+INSERT INTO prices_daily
+(ticker, date, open, high, low, close, adj_close, volume, etl_loaded_at)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+ON CONFLICT (ticker, date) DO UPDATE SET
+  open=EXCLUDED.open,
+  high=EXCLUDED.high,
+  low=EXCLUDED.low,
+  close=EXCLUDED.close,
+  adj_close=EXCLUDED.adj_close,
+  volume=EXCLUDED.volume,
+  etl_loaded_at=NOW();
+"""
+
 def ensure_table():
-    exec_sql(CREATE_SQL)
+    exec_sql(CREATE_TABLE)
 
 # ------------------------------
 #  데이터 로더
