@@ -23,9 +23,11 @@ dependencies = [
     "firecrawl-py",
     "qdrant-client",
     "sentence-transformers",
-
-    "langgraph",         
+    "langgraph",
     "langchain_core",
+    "psycopg2-binary>=2.9.11",
+    "certifi>=2025.10.5",
+    "pykrx>=1.0.51",
     "streamlit",
 ]
 
