@@ -1,6 +1,7 @@
 import os
 import uuid
 from typing import List, Dict
+from datetime import datetime
 
 from langchain_core.tools import tool
 from langchain_community.tools.tavily_search import TavilySearchResults
@@ -22,6 +23,16 @@ except ImportError:
     qdrant_client = QdrantClient(":memory:")
     print("--- [Tools] 경고: 'core.vector_db'를 찾지 못해 임시 :memory: 모드로 실행합니다. ---")
 
+
+# --- 2. 감성분석기 임포트 ---
+try:
+    from agents.sentiment_analyzer import sentiment_analyzer
+    print("--- [Tools] 감성분석기 로드 완료 ---")
+except ImportError:
+    print("--- [Tools] 경고: 'agents/sentiment_analyzer.py' 파일을 찾을 수 없습니다. 감성분석 비활성화 ---")
+    sentiment_analyzer = None
+
+
 # API 키 및 클라이언트 초기화 ---
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
@@ -33,14 +44,35 @@ if FIRECRAWL_API_KEY:
 else:
     print("--- [Tools] 경고: FIRECRAWL_API_KEY가 .env에 없습니다. 'ingest_news_qdrant' 툴이 실패합니다. ---")
 
-# --- 2. 임베딩 모델 (로컬) Qdrant ---
-print("\n--- [Tools] 로컬 임베딩 모델(SentenceTransformer) 로드 중... ---")
-# 'all-MiniLM-L6-v2'는 384차원의 벡터를 생성합니다.
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-EMBEDDING_DIMENSION = 384 
-COLLECTION_NAME = "sector_news_rag"
+# --- 3. 임베딩 모델 변경: multilingual-e5-large ---
+print("\n--- [Tools] 임베딩 모델 로드 중... ---")
+# ⭐ 변경: all-MiniLM-L6-v2 (384차원) → multilingual-e5-large (1024차원)
+embedding_model = SentenceTransformer('intfloat/multilingual-e5-large')
+EMBEDDING_DIMENSION = 1024  # ⭐ 384 → 1024
+COLLECTION_NAME = "sector_news_v2"  # ⭐ 새 컬렉션 이름
+print(f"--- [Tools] 임베딩 모델 로딩 완료: multilingual-e5-large ({EMBEDDING_DIMENSION}차원) ---")
 
-# --- 3. 툴 정의 (총 3개) ---
+# --- 4. 출처 신뢰도 맵 ---
+SOURCE_TRUST_MAP = {
+    "samsung.com": 0.95,      # 증권사 리서치
+    "miraeasset.com": 0.95,
+    "hankyung.com": 0.85,     # 경제 전문지
+    "mk.co.kr": 0.85,
+    "naver.com": 0.70,        # 포털 뉴스
+    "daum.net": 0.70,
+}
+
+def get_trust_score(url: str) -> float:
+    """URL에서 도메인 추출 후 신뢰도 점수 반환"""
+    try:
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc
+        domain = domain.replace('www.', '')
+        return SOURCE_TRUST_MAP.get(domain, 0.6)  # 기본값 0.6
+    except:
+        return 0.6
+
+# --- 5. 툴 정의 (총 3개) ---
 @tool
 def get_sector_etf_momentum(sector_name: str) -> dict:
     """
@@ -100,10 +132,13 @@ def search_realtime_news_tavily(query: str) -> List[Dict]:
 @tool
 def ingest_and_search_qdrant(sector_name: str) -> dict:
     """
-    (Agent 5 - 장기 기억) 1. Firecrawl로 'sector_name' 키워드 뉴스를 
-    수집(JSON)하여 Qdrant DB에 '저장(Ingest)'합니다.
-    2. Qdrant DB에서 'sector_name'과 가장 관련성 높은 뉴스를 '검색(Search)'합니다.
-    "지난 얼마 기간의 동향"이나 "깊이 있는 분석"에 사용합니다.
+    ⭐ 수정된 함수: FinBERT 감성분석 + 개선된 Qdrant 스키마
+    
+    (Agent 5 - 장기 기억) 
+    1. Firecrawl로 'sector_name' 키워드 뉴스 수집
+    2. FinBERT-KR로 감성분석
+    3. 풍부한 메타데이터와 함께 Qdrant DB에 저장
+    4. Qdrant DB에서 'sector_name'과 가장 관련성 높은 뉴스 검색
     """
     print(f"\n[Agent 5 Tool - Qdrant/Firecrawl] 장기 기억 RAG 시작. 섹터: '{sector_name}'")
     
@@ -112,63 +147,136 @@ def ingest_and_search_qdrant(sector_name: str) -> dict:
         return {"error": "Firecrawl 클라이언트가 초기화되지 않았습니다. (.env 키 확인)"}
     
     try:
-        print(f"  > [Firecrawl] '{sector_name}' 섹터 뉴스 3개 크롤링 시도...")
+        print(f"  > [Firecrawl] '{sector_name}' 섹터 뉴스 크롤링 시도...")
         # Firecrawl의 search는 SearchData 객체를 반환합니다.
         search_data = firecrawl_client.search(
-            query=f"{sector_name} 섹터 뉴스",
+            query=f"{sector_name} 섹터 뉴스 한국",
             scrape_options={
-                "max_results": 3,
+                "max_results": 10,
                 "country": "kr",
                 "time_range": "1y"
             }
         )
         
         # SearchData 객체에서 web 결과를 추출하여 Qdrant 포인트로 변환
-        points_to_upsert = []
+        # 뉴스 데이터 추출
+        news_list = []
         web_results = search_data.web if hasattr(search_data, 'web') else []
+
         for item in web_results:
             description = item.description if hasattr(item, 'description') else ''
             if description and len(description) > 50:  # 너무 짧은 설명은 제외
-                vector = embedding_model.encode(description).tolist()
-                payload = {
+                news_list.append({
                     "text": description,
-                    "source": item.url if hasattr(item, 'url') else '',
-                    "title": item.title if hasattr(item, 'title') else ''
-                }
-                # Qdrant의 ID는 URL 해시 등으로 고유하게 만드는 것이 좋음
-                points_to_upsert.append(
-                    models.PointStruct(
-                        id=str(uuid.uuid4()), # 지금은 임시로 랜덤 ID
-                        vector=vector,
-                        payload=payload
-                    )
-                )
+                    "title": item.title if hasattr(item, 'title') else '',
+                    "url": item.url if hasattr(item, 'url') else ''
+                })
         
-        if not points_to_upsert:
+        if not news_list:
              print("  > [Firecrawl] 크롤링된 뉴스가 없거나 유효하지 않습니다.")
              return {"error": "Firecrawl에서 유효한 뉴스를 수집하지 못했습니다."}
+        
+        print(f"  > [Firecrawl] {len(news_list)}개 뉴스 수집 완료")
 
-        # Qdrant에 실시간 저장 (upsert = 덮어쓰기/삽입)
+        # --- 2. 감성분석 (FinBERT 하이브리드) ---
+        if sentiment_analyzer:
+            print(f" > [FinBERT] 감성분석 시작...")
+            analyzed_news = sentiment_analyzer.analyze_batch(news_list)
+        else:
+            print("  > [경고] 감성분석기 비활성화. 기본값 사용")
+            analyzed_news = news_list
+
+        # --- 3. Qdrant 저장 (개선된 스키마) ---
+        print(f"  > [Qdrant] 벡터 DB 저장 시작...")
+        points_to_upsert = []
+        
+        for news in analyzed_news:
+            # 임베딩 생성 (원본 텍스트 전체)
+            vector = embedding_model.encode(news['text']).tolist()
+            
+            # ⭐ 개선된 Payload 스키마
+            payload = {
+                # 핵심 필드
+                "text": news['text'],           # 원본 전체
+                "title": news.get('title', ''),
+                "sector": sector_name,
+                
+                # 감성분석 (FinBERT)
+                "sentiment": news.get('sentiment', 'neutral'),
+                "sentiment_score": news.get('sentiment_score', 0.0),
+                "sentiment_confidence": news.get('sentiment_confidence', 0.0),
+                "analysis_method": news.get('method', 'none'),
+                
+                # 출처 신뢰도
+                "source_url": news.get('url', ''),
+                "source_domain": news.get('url', '').split('/')[2] if '/' in news.get('url', '') else '',
+                "source_trust_score": get_trust_score(news.get('url', '')),
+                
+                # 시간 정보
+                "published_at": datetime.now().isoformat(),
+                "crawled_at": datetime.now().isoformat(),
+                
+                # 중복 방지
+                "content_hash": str(uuid.uuid4()),  # 실제론 MD5(title+date)
+                
+                # 추가 메타
+                "companies": [],  # TODO: NER로 기업명 추출
+                "tags": [],       # TODO: 키워드 추출
+            }
+            
+            points_to_upsert.append(
+                models.PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector=vector,
+                    payload=payload
+                )
+            )
+        
+        # Qdrant upsert
         qdrant_client.upsert(
             collection_name=COLLECTION_NAME,
             points=points_to_upsert
         )
-        print(f"  > [Qdrant] {len(points_to_upsert)}개의 새 뉴스를 DB에 저장 완료.")
+        print(f"  > [Qdrant] {len(points_to_upsert)}개 뉴스 저장 완료")
 
     except Exception as e:
         print(f"  > !!! Firecrawl/Qdrant 수집 단계 에러: {e}")
         return {"error": str(e)}
 
-    # --- 2. 검색(Search) ---
+    # --- 4. 검색(Search) ---
     try:
-        query_vector = embedding_model.encode(f"{sector_name} 섹터의 전반적인 동향").tolist()
+        query_vector = embedding_model.encode(f"{sector_name} 섹터의 전반적인 동향과 투자 전망").tolist()
         search_results = qdrant_client.search(
             collection_name=COLLECTION_NAME,
             query_vector=query_vector,
-            limit=3
+            limit=5,  # ⭐ 3 → 5로 증가
+            # ⭐ 필터 추가 (선택)
+            # query_filter=models.Filter(
+            #     must=[
+            #         models.FieldCondition(
+            #             key="sentiment_confidence",
+            #             range=models.Range(gte=0.5)
+            #         )
+            #     ]
+            # )
         )
         
-        results = [{"score": res.score, "payload": res.payload} for res in search_results]
+        results = [
+            {
+                "score": res.score,
+                "payload": res.payload,
+                # 주요 정보만 추출 (LLM에게 전달)
+                "summary": {
+                    "title": res.payload.get('title', ''),
+                    "sentiment": res.payload.get('sentiment', 'neutral'),
+                    "sentiment_score": res.payload.get('sentiment_score', 0.0),
+                    "source": res.payload.get('source_domain', ''),
+                    "text_preview": res.payload.get('text', '')[:200] + "..."
+                }
+            }
+            for res in search_results
+        ]
+        
         print(f"  > [Qdrant] RAG 검색 완료. {len(results)}개 결과 반환.")
         return {"query": sector_name, "results": results}
         
@@ -176,34 +284,62 @@ def ingest_and_search_qdrant(sector_name: str) -> dict:
         print(f"  > !!! Qdrant 검색 단계 에러: {e}")
         return {"error": str(e)}
 
-# --- 5. 툴 리스트 ---
+# --- 6. 툴 리스트 ---
 available_tools = [
     get_sector_etf_momentum,
     search_realtime_news_tavily,
     ingest_and_search_qdrant
 ]
 
-# --- 6. (임시) Qdrant 컬렉션 생성 ---
+# --- 7. Qdrant 컬렉션 초기화 (새 스키마) ---
 def _initialize_qdrant_collection():
     """
-    서버 시작 시 Qdrant 컬렉션이 없으면 생성
+    ⭐ 수정: multilingual-e5-large (1024차원) 컬렉션 생성
+    기존 'sector_news_rag' 컬렉션은 무시하고 'sector_news_v2'만 관리
     """
     print("\n--- [Tools] Qdrant 컬렉션 초기화 시도... ---")
     try:
         # 컬렉션이 존재하는지 확인 (존재하지 않으면 에러 발생)
         try:
             qdrant_client.get_collection(collection_name=COLLECTION_NAME)
-            print(f"'{COLLECTION_NAME}' 컬렉션이 이미 존재합니다. 초기화 건너뜀.")
+            print(f"✅ '{COLLECTION_NAME}' 컬렉션이 이미 존재합니다. (1024차원)")
         except Exception:
-            # 컬렉션이 없으므로 새로 생성
-            print(f"'{COLLECTION_NAME}' 컬렉션이 없습니다. 새로 생성합니다.")
+            print(f"📦 '{COLLECTION_NAME}' 컬렉션이 없습니다. 새로 생성합니다... (1024차원)")
             qdrant_client.recreate_collection(
                 collection_name=COLLECTION_NAME,
-                vectors_config=VectorParams(size=EMBEDDING_DIMENSION, distance=Distance.COSINE)
+                vectors_config=VectorParams(
+                    size=EMBEDDING_DIMENSION,  # 1024
+                    distance=Distance.COSINE
+                )
             )
-            print(f"'{COLLECTION_NAME}' 컬렉션 생성 완료. (차원: {EMBEDDING_DIMENSION})")
+            
+            # ⭐ Payload 인덱스 생성 (필터링 성능)
+            print(f"  > Payload 인덱스 생성 중...")
+            qdrant_client.create_payload_index(
+                collection_name=COLLECTION_NAME,
+                field_name="sector",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            qdrant_client.create_payload_index(
+                collection_name=COLLECTION_NAME,
+                field_name="sentiment",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            
+            print(f"✅ '{COLLECTION_NAME}' 컬렉션 생성 완료 ({EMBEDDING_DIMENSION}차원)")
 
     except Exception as e:
         print(f"--- [Tools] !!! Qdrant 컬렉션 초기화 중 에러: {e} ---")
 
+# ⭐ 컬렉션 초기화 실행
 _initialize_qdrant_collection()
+
+# ⭐ 기존 컬렉션 정리 안내 (선택)
+try:
+    old_collections = qdrant_client.get_collections().collections
+    old_names = [c.name for c in old_collections if c.name != COLLECTION_NAME]
+    if old_names:
+        print(f"\n💡 참고: 기존 컬렉션 발견 {old_names}")
+        print(f"   삭제하려면: python -c \"from core.vector_db import qdrant_client; qdrant_client.delete_collection('{old_names[0]}')\"")
+except:
+    pass
