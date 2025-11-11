@@ -74,7 +74,7 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
         아래 3개의 툴을 *모두* 호출하여 데이터를 수집하세요:
         1. get_sector_etf_momentum(sector_name="{state['sector_name']}")
         2. search_realtime_news_tavily(query="{tavily_query}")
-        3. ingest_and_search_qdrant(sector_name="{qdrant_query}")
+        3. search_sector_news_qdrant(sector_name="{qdrant_query}")
         
         모든 툴 호출이 끝나면, 수집된 정보로 보고서를 생성하세요.
         """
