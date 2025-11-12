@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 투자 포트폴리오 분석 v2</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>  <!-- ✅ 이미 있음 -->
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI 투자 포트폴리오 분석 시스템</h1>
+            <p>고도화된 데이터 기반 투자 전략 분석</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- 입력 패널 -->
+            <div class="panel input-panel">
+                <h2>📝 투자 조건 입력</h2>
+                
+                <form id="portfolioForm">
+                    <!-- 0. AI 엔진 및 모델 선택 -->
+                    <div class="form-group">
+                        <label>🤖 AI 분석 엔진</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="ai-engine-option">
+                                <input type="radio" id="anthropic" name="aiEngine" value="anthropic" checked>
+                                <label for="anthropic" class="engine-label">
+                                    <div class="engine-title">🌟 Anthropic</div>
+                                    <div class="engine-desc">빠르고 안정적인 분석</div>
+                                </label>
+                            </div>
+                            <div class="ai-engine-option">
+                                <input type="radio" id="langgraph" name="aiEngine" value="langgraph">
+                                <label for="langgraph" class="engine-label">
+                                    <div class="engine-title">⚡ LangGraph</div>
+                                    <div class="engine-desc">고급 그래프 기반 분석</div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- 모델 선택 -->
+                        <label>🎯 분석 모델</label>
+                        <select id="modelSelect" name="model" style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #e9ecef; font-size: 1em;">
+                            <option value="">모델을 로딩 중...</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 1. 투자 예산 -->
+                    <div class="form-group">
+                        <label>💰 총 투자 예산 (원)</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" id="budgetInput" name="budget" value="5000000" 
+                                   min="1000000" step="10000" required
+                                   style="flex: 1; font-size: 1.05em; text-align: right;">
+                            <span id="budgetDisplay" style="min-width: 140px; font-weight: 600; color: #667eea; text-align: right; padding: 12px 15px; background: #f8f9fa; border-radius: 8px; border: 2px solid #e9ecef; font-size: 1.1em; white-space: nowrap;">
+                                5백만원
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- 2. 투자 대상 -->
+                    <div class="form-group">
+                        <label>🎯 투자 대상</label>
+                        <div class="tabs">
+                            <button type="button" class="tab active" data-tab="sectors">섹터 선택</button>
+                            <button type="button" class="tab" data-tab="stocks">종목 선택</button>
+                        </div>
+                        
+                        <div id="sectors-tab" class="tab-content active">
+                            <div class="selection-grid" id="sectorsList"></div>
+                            <div class="selected-count" id="sectorsCount">선택: 0개</div>
+                        </div>
+                        
+                        <div id="stocks-tab" class="tab-content">
+                            <div class="selection-grid" id="stocksList"></div>
+                            <div class="selected-count" id="stocksCount">선택: 0개</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 3. 투자 성향 -->
+                    <div class="form-group">
+                        <label>⚖️ 투자 위험 성향</label>
+                        <select name="risk_profile" required>
+                            <option value="안정">안정 (낮은 변동성, 안전 자산 선호)</option>
+                            <option value="중립">중립 (균형 잡힌 포트폴리오)</option>
+                            <option value="공격" selected>공격 (높은 수익률 추구)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 4. 투자 기간 -->
+                    <div class="form-group">
+                        <label>📅 투자 기간</label>
+                        <select name="investment_period" required>
+                            <option value="단기">단기 (3개월 이하)</option>
+                            <option value="중기" selected>중기 (3개월~12개월)</option>
+                            <option value="장기">장기 (1년 이상)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 5. 추가 프롬프트 -->
+                    <div class="form-group">
+                        <label>💬 추가 요구사항 (선택)</label>
+                        <textarea name="additional_prompt" 
+                                  placeholder="예: ESG 점수가 높은 종목 우선, 배당 수익 중시 등"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary" id="analyzeBtn">
+                        🚀 포트폴리오 분석 시작
+                    </button>
+                </form>
+            </div>
+            
+            <!-- 결과 패널 -->
+            <div class="panel result-panel">
+                <h2>📊 분석 결과</h2>
+                
+                <div id="emptyState" class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                    </svg>
+                    <h3>투자 조건을 입력하세요</h3>
+                    <p>AI가 최적의 포트폴리오를 분석합니다</p>
+                </div>
+                
+                <div id="loadingState" class="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <h3>AI가 포트폴리오를 분석하고 있습니다...</h3>
+                    <p style="margin-top: 10px; color: #666;">
+                        데이터 수집 → 점수 계산 → 최적화 → 보고서 생성
+                    </p>
+                </div>
+                
+                <div id="resultContent" class="result-content"></div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/index.js"></script>
+</body>
+</html>

@@ -17,7 +17,7 @@ os.environ.setdefault("CURL_CA_BUNDLE", r"C:\certs\cacert.pem")
 # 화이트리스트
 TICKERS = [r[0] for r in fetch_all("SELECT ticker FROM companies WHERE is_active = TRUE ORDER BY ticker;")]
 
-START = (date.today() - timedelta(days=365 * 2)).isoformat()
+START = (date.today() - timedelta(days=365 * 5)).isoformat()
 END = None  # 오늘까지
 
 # ------------------------------
