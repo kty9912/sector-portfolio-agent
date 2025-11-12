@@ -56,14 +56,13 @@ SECTORS = load_sectors()
 
 
 INDUSTRY_TRENDS = {
-    "반도체": "AI 반도체 수요 급증으로 2024년 강세 지속. HBM 메모리 공급 부족으로 프리미엄 유지 전망.",
-    "바이오": "바이오시밀러 글로벌 시장 확대. 미국 FDA 승인 증가로 성장성 우수.",
-    "방산": "글로벌 안보 불안정으로 방산 수출 호조. 국내 방산주 중장기 성장 모멘텀 확보.",
-    "통신": "5G 투자 마무리 단계. 안정적 배당 매력. AI 데이터센터 수혜 기대.",
-    "에너지": "재생에너지 전환 가속화. 원전 재개 논의로 관련주 수혜 가능.",
-    "원자력": "글로벌 인프라 투자 증가. 중동 프로젝트 수주 확대.",
-    "전력망": "전력망 현대화 수요 증가. 스마트그리드 투자 확대.",
-    "조선": "친환경 선박 수주 증가. LNG선·컨테이너선 발주 강세.",
+    "AI": "생성형 AI 확산으로 반도체·클라우드 수요 급증. 기업 간 AI 플랫폼 경쟁 심화로 시장 고성장세 유지.",
+    "반도체": "AI 반도체 수요 폭발로 고성능 메모리(HBM) 공급 부족 지속. 파운드리와 팹리스 동반 성장세.",
+    "전력망": "전력망 현대화 및 전력 인프라 교체 수요 확대. 스마트그리드 및 배전 자동화 관련주 수혜 예상.",
+    "원자력": "탄소중립 기조 속 원전 재평가. 중동·동유럽 프로젝트 수주 본격화로 장기 성장 모멘텀 확보.",
+    "조선": "친환경·LNG선 중심의 수주 호황 지속. 해운 운임 안정화와 글로벌 교체 수요로 업황 긍정적.",
+    "방산": "지정학적 긴장 고조로 국방예산 확대. 유럽·중동 중심의 수출 증가세로 중장기 성장 기대.",
+    "바이오": "글로벌 바이오시밀러 시장 확대 지속. 미국 FDA 승인 증가와 신약개발 투자 회복세 뚜렷.",
 }
 
 
@@ -572,8 +571,8 @@ def run_portfolio_agent(
 모든 Tool을 활용해 정확한 데이터 기반 분석을 수행하세요."""
 
     # 초기 메시지 수정
-    initial_context = "**사전 정보 (반드시 사용):**\n\n"
-    
+    initial_context = "**사전 정보 :**\n\n"
+   
     # 선택된 모든 종목의 정보를 미리 로드
     if "tickers" in investment_targets:
         initial_context += "선택 종목 정보:\n"
@@ -582,6 +581,16 @@ def run_portfolio_agent(
             if "error" not in company_info:
                 initial_context += f"- {company_info['ticker']}: {company_info['name']} ({company_info['sector']})\n"
     
+    if "sectors" in investment_targets:
+        sector_stocks = get_stocks_by_sector(investment_targets["sectors"])
+        print(sector_stocks)
+        for sector, stocks in sector_stocks.get("sector_stocks", {}).items():
+            for stock in stocks:
+                initial_context += f"- {stock['ticker']}: {stock['name']} ({sector})\n"
+
+    
+
+    print('initial_context:', initial_context)
     messages = [
         {
             "role": "user",

@@ -31,6 +31,11 @@ dependencies = [
     "tabulate>=0.9.0",
     "anthropic>=0.72.0",
     "plotly>=6.4.0",
+    "wkhtmltopdf>=0.2",
+    "weasyprint>=66.0",
+    "xhtml2pdf>=0.2.17",
+    "reportlab>=4.4.4",
+    "playwright>=1.56.0",
 ]
 
 # 3. 개발용/선택적 의존성 (테스트, 린팅 등)
