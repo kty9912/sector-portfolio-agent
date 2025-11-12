@@ -3,4 +3,4 @@ __pycache__/
 ./agents/__pycache__/
 *.db
 .env
-./github
+./github/copilot-instructions.md

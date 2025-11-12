@@ -128,7 +128,7 @@ def create_graph_engine(model_name: str, recursion_limit: int = 7):
                             momentum_result = result
                         elif tool_name == "search_realtime_news_tavily":
                             realtime_news_result = result
-                        elif tool_name == "ingest_and_search_qdrant":
+                        elif tool_name == "search_sector_news_qdrant":
                             historical_news_result = result
                             
                         tool_messages.append(ToolMessage(content=str(result), tool_call_id=call["id"]))
