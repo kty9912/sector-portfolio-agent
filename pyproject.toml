@@ -2,7 +2,7 @@
 # 1. 프로젝트 기본 정보 (필수)
 name = "sector-portfolio-agent"
 version = "0.1.0"
-description = "AI-powered sector portfolio generator"
+description = "AI-powered sector portfolio generator (LangGraph Engine)"
 requires-python = ">=3.10"  # 사용할 파이썬 최소 버전을 지정합니다.
 
 # 2. 핵심 의존성 (Agent 실행에 필요한 것들)
@@ -15,7 +15,11 @@ dependencies = [
     "pandas",
     "langchain",
     "langchain-openai",
+
+    # --- RAG & Tool 라이브러리 ---
     "langchain-community",
+    "tavily-python",
+
     "firecrawl-py",
     "qdrant-client",
     "sentence-transformers",
@@ -27,6 +31,11 @@ dependencies = [
     "anthropic>=0.72.0",
     "plotly>=6.4.0",
     "playwright>=1.56.0",
+    "streamlit",
+    "transformers>=4.30.0",     # FinBERT-KR
+    "torch>=2.0.0",             # PyTorch (CPU 버전)
+    "sentencepiece>=0.1.99",    # Tokenizer
+
 ]
 
 # 3. 개발용/선택적 의존성 (테스트, 린팅 등)
