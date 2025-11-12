@@ -9,7 +9,10 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 # 필요할 때 지연 로드(lazy-load)합니다.
 from qdrant_client.http import models
 from qdrant_client.http.models import Distance, VectorParams
-from firecrawl import FirecrawlApp
+try:
+    from firecrawl import FirecrawlApp
+except Exception:
+    FirecrawlApp = None
 import yfinance as yf
 import pandas as pd
 
