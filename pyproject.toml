@@ -35,6 +35,8 @@ dependencies = [
     "transformers>=4.30.0",     # FinBERT-KR
     "torch>=2.0.0",             # PyTorch (CPU 버전)
     "sentencepiece>=0.1.99",    # Tokenizer
+    "langchain_google_genai",
+    "langchain_groq",
 
 ]
 

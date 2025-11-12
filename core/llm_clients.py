@@ -11,24 +11,25 @@ UPSTAGE_MODEL_NAME = os.getenv("LLM_PROVIDER_UPSTAGE_MODEL", "solar-pro2")
 print(f"[DEBUG] UPSTAGE_API_KEY loaded: {bool(UPSTAGE_API_KEY)}")
 print(f"[DEBUG] UPSTAGE_MODEL_NAME: {UPSTAGE_MODEL_NAME}")
 
-# 2. OpenAI (새로 추가!)
+# 2. OpenAI 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL_NAME = os.getenv("LLM_PROVIDER_OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MODEL_NAME = os.getenv("LLM_PROVIDER_OPENAI_MODEL", "gpt-4o")
 print(f"[DEBUG] OPENAI_API_KEY loaded: {bool(OPENAI_API_KEY)}")
 print(f"[DEBUG] OPENAI_MODEL_NAME: {OPENAI_MODEL_NAME}")
 
-# 3. Google Gemini (사용 안함)
-# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-# GEMINI_MODEL_NAME = os.getenv("LLM_PROVIDER_GEMINI_MODEL", "gemini-1.5-pro")
-GOOGLE_API_KEY = None
-GEMINI_MODEL_NAME = "gemini-1.5-pro"
+# 3. Google Gemini 
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GEMINI_MODEL_NAME = os.getenv("LLM_PROVIDER_GEMINI_MODEL", "gemini-2.5-pro")
+print(f"[DEBUG] GOOGLE_API_KEY loaded: {bool(GOOGLE_API_KEY)}")
+print(f"[DEBUG] GEMINI_MODEL_NAME: {GEMINI_MODEL_NAME}")
 
 
-# 4. Groq (사용 안함)
+# 4. GROQ
 # GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-# GROQ_MODEL_NAME = os.getenv("LLM_PROVIDER_GROQ_MODEL", "llama3-8b-8192")
 GROQ_API_KEY = None
-GROQ_MODEL_NAME = "llama3-8b-8192"
+GROQ_MODEL_NAME = os.getenv("LLM_PROVIDER_GROQ_MODEL", "llama-3.3-70b-versatile")
+print(f"[DEBUG] GROQ_API_KEY loaded: {bool(GROQ_API_KEY)}")
+print(f"[DEBUG] GROQ_MODEL_NAME: {GROQ_MODEL_NAME}")
 
 
 # --- 사용 가능한 모델의 "전체 목록" ---
