@@ -108,23 +108,10 @@ async function updateModelOptions() {
     try {
         const availableModels = await loadAvailableModels();
         
-        if (selectedEngine === 'langgraph') {
-            // LangGraph는 모든 사용 가능한 모델 + 추가 모델
-            const langGraphModels = [
-                ...availableModels,
-                'gpt-4o',
-                'gpt-4o-mini'
-            ];
-            
-            modelSelect.innerHTML = [...new Set(langGraphModels)].map(model => 
-                `<option value="${model}">${getModelDisplayName(model)}</option>`
-            ).join('');
-        } else {
-            // Anthropic는 사용 가능한 모델만
-            modelSelect.innerHTML = availableModels.map(model => 
-                `<option value="${model}">${getModelDisplayName(model)}</option>`
-            ).join('');
-        }
+        // 백엔드의 AVAILABLE_MODELS만 사용 (하드코딩 제거)
+        modelSelect.innerHTML = availableModels.map(model => 
+            `<option value="${model}">${getModelDisplayName(model)}</option>`
+        ).join('');
         
         console.log(`✅ ${selectedEngine} 엔진용 모델 목록 업데이트 완료`);
     } catch (error) {

@@ -219,7 +219,8 @@ async def analyze_langgraph(request: PortfolioRequest):
             },
             risk_profile=request.risk_profile,
             investment_period=request.investment_period,
-            additional_prompt=request.additional_prompt
+            additional_prompt=request.additional_prompt,
+            model_name=request.model_name  # ⭐ 모델 선택 추가
         )
         
         if result["success"]:

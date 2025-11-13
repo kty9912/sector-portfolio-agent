@@ -37,6 +37,7 @@ class MultiAgentState(TypedDict):
     risk_profile: str
     investment_period: str
     additional_prompt: str
+    model_name: str  # ⭐ 사용할 LLM 모델명
     
     # 기본 데이터
     company_infos: Dict[str, Dict[str, Any]]  # ticker -> company info
@@ -312,9 +313,10 @@ def financial_agent_node(state: MultiAgentState) -> MultiAgentState:
     print("💰 [재무 분석 전문가] 분석 시작")
     print("="*60)
     
-    # 사용 가능한 첫 번째 모델 사용
-    from core.llm_clients import AVAILABLE_MODELS
-    llm = get_chat_model(AVAILABLE_MODELS[0])
+    # ⭐ 상태에서 선택된 모델 사용
+    model_name = state.get("model_name", "gpt-4o-mini")
+    llm = get_chat_model(model_name)
+    print(f"  📌 사용 모델: {model_name}")
     
     # ⭐ 이미 초기화 단계에서 수집된 데이터 활용
     financial_data = state.get("financial_metrics", {})
@@ -420,9 +422,10 @@ def technical_agent_node(state: MultiAgentState) -> MultiAgentState:
     print("📈 [기술 분석 전문가] 분석 시작")
     print("="*60)
     
-    # 사용 가능한 첫 번째 모델 사용
-    from core.llm_clients import AVAILABLE_MODELS
-    llm = get_chat_model(AVAILABLE_MODELS[0])
+    # ⭐ 상태에서 선택된 모델 사용
+    model_name = state.get("model_name", "gpt-4o-mini")
+    llm = get_chat_model(model_name)
+    print(f"  📌 사용 모델: {model_name}")
     
     # ⭐ 이미 초기화 단계에서 수집된 데이터 활용
     technical_data = state.get("technical_signals", {})
@@ -538,9 +541,10 @@ def news_agent_node(state: MultiAgentState) -> MultiAgentState:
     print("📰 [뉴스 분석 전문가] 분석 시작")
     print("="*60)
     
-    # 사용 가능한 첫 번째 모델 사용
-    from core.llm_clients import AVAILABLE_MODELS
-    llm = get_chat_model(AVAILABLE_MODELS[0])
+    # ⭐ 상태에서 선택된 모델 사용
+    model_name = state.get("model_name", "gpt-4o-mini")
+    llm = get_chat_model(model_name)
+    print(f"  📌 사용 모델: {model_name}")
     
     company_infos = state.get("company_infos", {})
     stock_prices = state.get("stock_prices", {})
@@ -713,13 +717,10 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
     print("👔 [Supervisor] 전문가 의견 통합 및 최종 포트폴리오 구성")
     print("="*60)
     
-    # Supervisor는 가능한 한 강력한 모델 사용 (OpenAI 우선, 없으면 Upstage)
-    from core.llm_clients import OPENAI_API_KEY, OPENAI_MODEL_NAME, UPSTAGE_MODEL_NAME
-    
-    if OPENAI_API_KEY:
-        llm = get_chat_model(OPENAI_MODEL_NAME)
-    else:
-        llm = get_chat_model(UPSTAGE_MODEL_NAME)
+    # ⭐ 상태에서 선택된 모델 사용 (Supervisor도 동일 모델 사용)
+    model_name = state.get("model_name", "gpt-4o-mini")
+    llm = get_chat_model(model_name)
+    print(f"  📌 사용 모델: {model_name}")
     
     # 3명의 전문가 의견 수집
     financial = state.get("financial_analysis", {})
@@ -966,7 +967,8 @@ def run_multi_agent_portfolio(
     investment_targets: Dict[str, List[str]],
     risk_profile: str,
     investment_period: str,
-    additional_prompt: str = ""
+    additional_prompt: str = "",
+    model_name: str = None  # ⭐ 모델 선택 파라미터 추가
 ) -> Dict[str, Any]:
     """멀티 에이전트 포트폴리오 분석 실행"""
     
@@ -976,12 +978,20 @@ def run_multi_agent_portfolio(
     
     graph = build_multi_agent_graph()
     
+    # ⭐ model_name이 없으면 기본값 사용
+    if not model_name:
+        from core.llm_clients import AVAILABLE_MODELS
+        model_name = AVAILABLE_MODELS[0] if AVAILABLE_MODELS else "gpt-4o-mini"
+    
+    print(f"🔧 사용 모델: {model_name}")
+    
     initial_state: MultiAgentState = {
         "budget": budget,
         "investment_targets": investment_targets,
         "risk_profile": risk_profile,
         "investment_period": investment_period,
         "additional_prompt": additional_prompt,
+        "model_name": model_name,  # ⭐ 모델명 추가
         
         "company_infos": {},
         "stock_prices": {},
