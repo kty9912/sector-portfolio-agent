@@ -4,7 +4,8 @@ from typing import List, Dict
 from datetime import datetime
 
 from langchain_core.tools import tool
-from langchain_community.tools.tavily_search import TavilySearchResults
+# from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain_tavily import TavilySearch
 # SentenceTransformer은 무거우므로 모듈 임포트 시 즉시 로드하지 않습니다.
 # 필요할 때 지연 로드(lazy-load)합니다.
 from qdrant_client.http import models
@@ -95,7 +96,7 @@ def get_trust_score(url: str) -> float:
     except:
         return 0.6
 
-# --- 5. 툴 정의 (총 3개) ---
+# --- 툴 정의  ---
 @tool
 def get_sector_etf_momentum(sector_name: str) -> dict:
     """
@@ -114,11 +115,16 @@ def get_sector_etf_momentum(sector_name: str) -> dict:
     ticker = SECTOR_ETF_MAP.get(sector_name, "SPY") # 기본값 SPY
     
     try:
-        data = yf.download(ticker, period="3mo", progress=False)
+        data = yf.download(ticker, period="3mo", progress=False, auto_adjust=True)
         if data.empty:
             return {"error": f"No data found for {ticker}"}
             
         data['SMA_50'] = data['Close'].rolling(window=50).mean()
+        data = data.dropna(subset=['SMA_50'])
+
+        if data.empty:
+            return {"error": f"Not enough data for 50-day SMA on {ticker}"}
+
         latest_close = data['Close'].iloc[-1]
         latest_sma = data['SMA_50'].iloc[-1]
         momentum_signal = "Positive" if latest_close > latest_sma else "Negative"
@@ -134,6 +140,31 @@ def get_sector_etf_momentum(sector_name: str) -> dict:
         return {"error": str(e)}
 
 @tool
+def get_multiple_sectors_momentum(sector_names: List[str]) -> dict:
+    """
+    여러 섹터의 모멘텀을 한 번에 분석
+    
+    Args:
+        sector_names: ["반도체", "AI", "바이오"] 형태의 섹터 리스트
+    
+    Returns:
+        {
+            "sectors": {
+                "반도체": {...},
+                "AI": {...}
+            }
+        }
+    """
+    print(f"\n[Agent 2 Tool] 복수 섹터 모멘텀 분석: {sector_names}")
+    
+    results = {}
+    for sector in sector_names:
+        result = get_sector_etf_momentum.invoke({"sector_name": sector})
+        results[sector] = result
+    
+    return {"sectors": results}
+
+@tool
 def search_realtime_news_tavily(query: str) -> List[Dict]:
     """
     (Agent 5 - 단기 기억) Tavily를 사용해 '지금 이 순간'의 최신 뉴스를 
@@ -144,8 +175,12 @@ def search_realtime_news_tavily(query: str) -> List[Dict]:
         return [{"error": "TAVILY_API_KEY가 .env에 없습니다."}]
     
     try:
-        tavily_tool = TavilySearchResults(max_results=10, tavily_api_key=TAVILY_API_KEY)
-        results = tavily_tool.invoke(query)
+        tavily_tool = TavilySearch(max_results=10, 
+                                   tavily_api_key=TAVILY_API_KEY,
+                                   topic="finance",
+                                   time_range='month'
+                                   )
+        results = tavily_tool.invoke({'query': "{}의 최신 뉴스를 검색하고 요약합니다. '최신 속보'나 '오늘 동향'에 사용합니다.".format(query)})
         print(f"[Agent 5 Tool - Tavily] 실시간 검색 완료. {len(results)}개 결과 반환.")
         return results # (이미 요약된 내용과 출처 URL이 포함된 dict 리스트)
     except Exception as e:
@@ -252,17 +287,145 @@ def search_sector_news_qdrant(sector_name: str) -> dict:
         print(f"  > !!! Qdrant 검색 에러: {e}")
         return {"error": str(e)}
 
+@tool
+def search_multiple_sectors_news(sector_names: List[str], limit_per_sector: int = 5) -> dict:
+    """
+    ⭐ 여러 섹터의 뉴스를 한 번에 검색
+    
+    Args:
+        sector_names: ["반도체", "AI", "바이오"]
+        limit_per_sector: 섹터당 뉴스 개수 (기본 5개)
+    
+    Returns:
+        {
+            "sectors": {
+                "반도체": {뉴스 검색 결과},
+                "AI": {뉴스 검색 결과}
+            },
+            "combined_sentiment": {전체 감성 통계}
+        }
+    """
+    print(f"\n[Agent 5 Tool - Qdrant] 복수 섹터 뉴스 검색: {sector_names}")
+    
+    results = {}
+    all_news = []
+    
+    for sector in sector_names:
+        result = search_sector_news_qdrant.invoke({
+            "sector_name": sector,
+            "limit": limit_per_sector
+        })
+        results[sector] = result
+        
+        # 전체 뉴스 수집
+        if "news" in result:
+            all_news.extend(result["news"])
+    
+    # 전체 감성 통계 계산
+    combined_sentiment = {
+        "positive": sum(1 for n in all_news if n['sentiment'] == 'positive'),
+        "neutral": sum(1 for n in all_news if n['sentiment'] == 'neutral'),
+        "negative": sum(1 for n in all_news if n['sentiment'] == 'negative'),
+        "avg_sentiment_score": round(
+            sum(n['sentiment_score'] for n in all_news) / len(all_news), 3
+        ) if all_news else 0.0
+    }
+    
+    print(f"  > [Qdrant] 복수 섹터 검색 완료: 총 {len(all_news)}개 뉴스")
+    
+    return {
+        "sectors": results,
+        "combined_sentiment": combined_sentiment,
+        "total_news_count": len(all_news)
+    }
+
+@tool
+def search_stock_news(ticker: str, company_name: str, limit: int = 5) -> dict:
+    """
+    ⭐ 특정 종목의 뉴스 검색
+    
+    Args:
+        ticker: "005930.KS"
+        company_name: "삼성전자"
+        limit: 뉴스 개수
+    
+    Returns:
+        종목 관련 뉴스 검색 결과
+    """
+    print(f"\n[Agent 5 Tool - Qdrant] 종목 뉴스 검색: {company_name} ({ticker})")
+    
+    try:
+        model = _get_embedding_model()
+        query_text = f"query: {company_name} 최근 뉴스와 전망"
+        query_vector = model.encode(query_text).tolist()
+        
+        search_results = qdrant_client.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=query_vector,
+            limit=50,
+            score_threshold=0.4
+        )
+        
+        # 결과 정리
+        candidates = []
+        for res in search_results:
+            payload = res.payload
+            
+            # 종목명이 제목이나 본문에 포함된 뉴스만 필터링
+            text_content = (payload.get('title', '') + ' ' + payload.get('text', '')).lower()
+            if company_name.lower() not in text_content:
+                continue
+            
+            sentiment_conf = payload.get('sentiment_confidence', 0.0)
+            source_trust = get_trust_score(payload.get('source_url', ''))
+            
+            combined_score = (
+                res.score * 0.5 + 
+                sentiment_conf * 0.3 + 
+                source_trust * 0.2
+            )
+            
+            candidates.append({
+                "combined_score": combined_score,
+                "title": payload.get('title', '')[:80],
+                "sentiment": payload.get('sentiment', 'neutral'),
+                "sentiment_score": payload.get('sentiment_score', 0.0),
+                "source": payload.get('source_domain', ''),
+                "published_at": payload.get('published_at', '')[:10],
+                "text_preview": payload.get('text', '')[:150] + "..."
+            })
+        
+        candidates.sort(key=lambda x: x['combined_score'], reverse=True)
+        top_results = candidates[:limit]
+        
+        print(f"  > [Qdrant] '{company_name}' 뉴스 {len(top_results)}개 발견")
+        
+        return {
+            "ticker": ticker,
+            "company_name": company_name,
+            "news_count": len(top_results),
+            "news": top_results
+        }
+        
+    except Exception as e:
+        print(f"  > !!! 종목 뉴스 검색 에러: {e}")
+        return {"error": str(e)}
+
+
 # --- 6. 툴 리스트 ---
 available_tools = [
     get_sector_etf_momentum,
     search_realtime_news_tavily,
-    search_sector_news_qdrant
+    search_sector_news_qdrant,
+    get_multiple_sectors_momentum,
+    search_multiple_sectors_news,
+    search_stock_news
 ]
 
 # --- Qdrant 컬렉션 확인 (초기화 X) ---
 def _check_qdrant_collection():
     """
-    ⭐ 변경: 컬렉션 생성 안함 (이미 49,605개 데이터 존재)
+    컬렉션
     존재 여부만 확인
     """
     print("\n--- [Tools] Qdrant 컬렉션 확인... ---")
