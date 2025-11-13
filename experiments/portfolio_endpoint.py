@@ -21,6 +21,8 @@ from datetime import datetime
 
 from agent_test.portfolio_agent_anthropic import run_portfolio_agent, AVAILABLE_STOCKS, SECTORS
 from agent_test.portfolio_agent_langgraph import run_portfolio_agent_langgraph
+from agent_test.portfolio_agent_multi import run_multi_agent_portfolio
+
 from core.llm_clients import AVAILABLE_MODELS
 
 app = FastAPI(title="AI 투자 포트폴리오 분석 시스템 v2")
@@ -53,6 +55,11 @@ class PortfolioRequest(BaseModel):
 @app.get("/", response_class=FileResponse)
 async def index():
     return FileResponse("experiments/templates/index.html")
+
+@app.get("/test-multi-agent", response_class=FileResponse)
+async def test_multi_agent():
+    """멀티 에이전트 테스트 페이지"""
+    return FileResponse("experiments/templates/test_multi_agent.html")
 
 @app.get("/api/sectors")
 async def get_sectors():
@@ -98,7 +105,8 @@ def parse_agent_result(result, engine="anthropic"):
             "ai_summary": result.get("ai_summary"),
             "portfolio_allocation": result.get("portfolio_allocation"),
             "performance_metrics": result.get("performance_metrics"),
-            "chart_data": result.get("chart_data")
+            "chart_data": result.get("chart_data"),
+            "discussion_history": result.get("discussion_history", [])  # ⭐ 멀티에이전트 전문가 의견
         }
     
     # 2. Anthropic 방식 (문자열 파싱 필요)
@@ -192,10 +200,10 @@ async def analyze_anthropic(request: PortfolioRequest):
 
 @app.post("/api/analyze/langgraph")
 async def analyze_langgraph(request: PortfolioRequest):
-    """LangGraph 엔진으로 포트폴리오 분석"""
+    """멀티 에이전트로 포트폴리오 분석 (LangGraph 엔드포인트 대체)"""
     try:
         print(f"\n{'='*60}")
-        print(f"⚡ LangGraph 분석 요청")
+        print(f"🤖 멀티 에이전트 분석 요청 (LangGraph 엔드포인트)")
         print(f"  예산: {request.budget:,}원")
         print(f"  섹터: {request.investment_targets.sectors}")
         print(f"  종목: {request.investment_targets.tickers}")
@@ -203,7 +211,7 @@ async def analyze_langgraph(request: PortfolioRequest):
         print(f"  기간: {request.investment_period}")
         print(f"{'='*60}\n")
         
-        result = run_portfolio_agent_langgraph(
+        result = run_multi_agent_portfolio(
             budget=request.budget,
             investment_targets={
                 "sectors": request.investment_targets.sectors,
@@ -211,7 +219,8 @@ async def analyze_langgraph(request: PortfolioRequest):
             },
             risk_profile=request.risk_profile,
             investment_period=request.investment_period,
-            additional_prompt=request.additional_prompt
+            additional_prompt=request.additional_prompt,
+            model_name=request.model_name  # ⭐ 모델 선택 추가
         )
         
         if result["success"]:
@@ -474,6 +483,20 @@ async def download_pdf(request: dict):
                     font-size: 11px !important;  /* ⭐ 폰트 크기 감소 */
                     font-family: 'Malgun Gothic', Arial, sans-serif !important;
                 }
+                /* 투자 책임 경고 - PDF용 */
+                .disclaimer {
+                    background: #fff3cd !important;
+                    border: 2px solid #ffc107 !important;
+                    border-radius: 8px !important;
+                    padding: 15px !important;
+                    margin-top: 30px !important;
+                    page-break-inside: avoid !important;
+                }
+                .disclaimer p {
+                    font-size: 10px !important;
+                    line-height: 1.5 !important;
+                    color: #333 !important;
+                }
             }
         </style>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -561,6 +584,18 @@ async def download_pdf(request: dict):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"PDF 생성 오류: {str(e)}")
+
+@app.post("/api/analyze/multi-agent")
+async def analyze_portfolio_multi_agent(request: PortfolioRequest):
+    """멀티 에이전트 포트폴리오 분석"""
+    result = run_multi_agent_portfolio(
+        budget=request.budget,
+        investment_targets=request.investment_targets,
+        risk_profile=request.risk_profile,
+        investment_period=request.investment_period,
+        additional_prompt=request.additional_prompt
+    )
+    return result
 
 # =====================================================
 # 실행

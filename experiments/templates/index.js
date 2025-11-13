@@ -108,23 +108,10 @@ async function updateModelOptions() {
     try {
         const availableModels = await loadAvailableModels();
         
-        if (selectedEngine === 'langgraph') {
-            // LangGraph는 모든 사용 가능한 모델 + 추가 모델
-            const langGraphModels = [
-                ...availableModels,
-                'gpt-4o',
-                'gpt-4o-mini'
-            ];
-            
-            modelSelect.innerHTML = [...new Set(langGraphModels)].map(model => 
-                `<option value="${model}">${getModelDisplayName(model)}</option>`
-            ).join('');
-        } else {
-            // Anthropic는 사용 가능한 모델만
-            modelSelect.innerHTML = availableModels.map(model => 
-                `<option value="${model}">${getModelDisplayName(model)}</option>`
-            ).join('');
-        }
+        // 백엔드의 AVAILABLE_MODELS만 사용 (하드코딩 제거)
+        modelSelect.innerHTML = availableModels.map(model => 
+            `<option value="${model}">${getModelDisplayName(model)}</option>`
+        ).join('');
         
         console.log(`✅ ${selectedEngine} 엔진용 모델 목록 업데이트 완료`);
     } catch (error) {
@@ -324,7 +311,84 @@ function renderResults(reportText, iterations) {
             <div class="section-title">🎯 AI 종합 브리핑</div>
             <div class="summary-box">` + (data.ai_summary || '분석 요약 정보 없음') + `</div>
         </div>
+    `;
+    
+    // ⭐ 멀티에이전트 전문가 의견 표시 (discussion_history가 있는 경우만)
+    if (data.discussion_history && data.discussion_history.length > 0) {
+        html += `
+        <!-- 1.5. 전문가 분석 의견 -->
+        <div class="section">
+            <div class="section-title">👥 전문가 분석 의견</div>
+            <div style="display: grid; gap: 15px;">
+        `;
         
+        data.discussion_history.forEach((opinion, idx) => {
+            // 전문가 타입 감지 (재무/기술/뉴스)
+            let expertType = '전문가';
+            let expertIcon = '💼';
+            let expertColor = '#667eea';
+            
+            if (opinion.includes('[재무 전문가]') || opinion.includes('Financial Agent')) {
+                expertType = '재무 전문가';
+                expertIcon = '💰';
+                expertColor = '#28a745';
+            } else if (opinion.includes('[기술 전문가]') || opinion.includes('Technical Agent')) {
+                expertType = '기술 전문가';
+                expertIcon = '📊';
+                expertColor = '#007bff';
+            } else if (opinion.includes('[뉴스 전문가]') || opinion.includes('News Agent')) {
+                expertType = '뉴스 전문가';
+                expertIcon = '📰';
+                expertColor = '#dc3545';
+            }
+            
+            // [재무 전문가] 등 태그 제거
+            let cleanOpinion = opinion
+                .replace(/\[재무 전문가\]\s*/g, '')
+                .replace(/\[기술 전문가\]\s*/g, '')
+                .replace(/\[뉴스 전문가\]\s*/g, '')
+                .replace(/Financial Agent:\s*/gi, '')
+                .replace(/Technical Agent:\s*/gi, '')
+                .replace(/News Agent:\s*/gi, '')
+                .trim();
+            
+            html += `
+                <div style="
+                    background: linear-gradient(135deg, ${expertColor}15 0%, ${expertColor}05 100%);
+                    border-left: 4px solid ${expertColor};
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                ">
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        margin-bottom: 10px;
+                        font-weight: 600;
+                        color: ${expertColor};
+                        font-size: 14px;
+                    ">
+                        <span style="font-size: 20px;">${expertIcon}</span>
+                        <span>${expertType}</span>
+                    </div>
+                    <div style="
+                        line-height: 1.6;
+                        color: #333;
+                        font-size: 13px;
+                        white-space: pre-wrap;
+                    ">${cleanOpinion}</div>
+                </div>
+            `;
+        });
+        
+        html += `
+            </div>
+        </div>
+        `;
+    }
+    
+    html += `
         <!-- 2. 성과 지표 -->
         <div class="section">
             <div class="section-title">📈 예상 성과 지표</div>
@@ -477,8 +541,18 @@ function renderResults(reportText, iterations) {
             </div>
         </div>
         
+        <!-- 투자 책임 경고 -->
+        <div class="disclaimer" style="background: rgba(255, 243, 205, 0.3); border-left: 4px solid #ffc107; border-radius: 8px; padding: 20px; margin-top: 40px;">
+            <p style="color: #495057; font-size: 0.9em; line-height: 1.6; margin: 0;">
+                ⚠️ <strong style="color: #f39c12;">투자 유의사항</strong><br>
+                본 분석 결과는 AI 알고리즘 기반의 참고 자료이며, 투자 권유나 종목 추천이 아닙니다. 
+                과거 데이터와 통계 분석을 기반으로 생성된 정보이므로, 미래 수익을 보장하지 않습니다. 
+                모든 투자 결정과 그에 따른 손익은 투자자 본인의 책임입니다.
+            </p>
+        </div>
+        
         <!-- ⭐ PDF 다운로드 버튼을 맨 아래에 추가 -->
-        <div style="margin-top: 40px;">
+        <div style="margin-top: 20px;">
             <button id="downloadPdfBtn" class="btn-primary">
                 📄 PDF 다운로드
             </button>
@@ -588,6 +662,30 @@ function renderResults(reportText, iterations) {
                         .btn-primary { display: none !important; }
                         #downloadPdfBtn { display: none !important; }
                         /* 차트는 이제 표시됩니다! */
+                        
+                        /* ⭐ 전문가 의견 스타일 (PDF용) */
+                        .expert-opinion-card {
+                            background: #f8f9fa;
+                            border-left: 4px solid #667eea;
+                            padding: 12px;
+                            border-radius: 6px;
+                            margin-bottom: 12px;
+                            page-break-inside: avoid;
+                        }
+                        .expert-header {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            margin-bottom: 8px;
+                            font-weight: 600;
+                            font-size: 12px;
+                        }
+                        .expert-content {
+                            line-height: 1.5;
+                            color: #333;
+                            font-size: 10px;
+                            white-space: pre-wrap;
+                        }
                     </style>
                 </head>
                 <body>
