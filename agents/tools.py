@@ -5,10 +5,14 @@ from datetime import datetime
 
 from langchain_core.tools import tool
 from langchain_community.tools.tavily_search import TavilySearchResults
-from sentence_transformers import SentenceTransformer
+# SentenceTransformer은 무거우므로 모듈 임포트 시 즉시 로드하지 않습니다.
+# 필요할 때 지연 로드(lazy-load)합니다.
 from qdrant_client.http import models
 from qdrant_client.http.models import Distance, VectorParams
-from firecrawl import FirecrawlApp
+try:
+    from firecrawl import FirecrawlApp
+except Exception:
+    FirecrawlApp = None
 import yfinance as yf
 import pandas as pd
 
@@ -44,13 +48,32 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 # else:
 #     print("--- [Tools] 경고: FIRECRAWL_API_KEY가 .env에 없습니다. 'ingest_news_qdrant' 툴이 실패합니다. ---")
 
-# --- 3. 임베딩 모델 변경: multilingual-e5-large ---
-print("\n--- [Tools] 임베딩 모델 로드 중... ---")
-# ⭐ 변경: all-MiniLM-L6-v2 (384차원) → multilingual-e5-large (1024차원)
-embedding_model = SentenceTransformer('intfloat/multilingual-e5-large')
-EMBEDDING_DIMENSION = 1024  # ⭐ 384 → 1024
-COLLECTION_NAME = "sector_news_v2"  # ⭐ 새 컬렉션 이름
-print(f"--- [Tools] 임베딩 모델 로딩 완료: multilingual-e5-large ({EMBEDDING_DIMENSION}차원) ---")
+# --- 3. 임베딩 모델: lazy-load 설정 ---
+# 실제 모델 객체은 _embedding_model에 캐시됩니다.
+_embedding_model = None
+EMBEDDING_DIMENSION = None
+COLLECTION_NAME = "sector_news_v2"
+
+def _get_embedding_model():
+    """임베딩 모델을 지연 로드합니다. 이미 로드되어 있다면 캐시를 반환합니다."""
+    global _embedding_model, EMBEDDING_DIMENSION
+    if _embedding_model is not None:
+        return _embedding_model
+
+    try:
+        from sentence_transformers import SentenceTransformer
+    except Exception as e:
+        raise ImportError("SentenceTransformer 패키지가 필요합니다. 'sentence-transformers'를 설치하세요.")
+
+    print("\n--- [Tools] 임베딩 모델 로드 중... ---")
+    _embedding_model = SentenceTransformer('intfloat/multilingual-e5-large')
+    try:
+        EMBEDDING_DIMENSION = _embedding_model.get_sentence_embedding_dimension()
+    except Exception:
+        # fallback: 기존 하드코딩 값
+        EMBEDDING_DIMENSION = 1024
+    print(f"--- [Tools] 임베딩 모델 로딩 완료: multilingual-e5-large ({EMBEDDING_DIMENSION}차원) ---")
+    return _embedding_model
 
 # --- 4. 출처 신뢰도 맵 ---
 SOURCE_TRUST_MAP = {
@@ -145,7 +168,9 @@ def search_sector_news_qdrant(sector_name: str) -> dict:
         # --- 1. 검색 쿼리 생성 (더 정교하게) ---
         # E5 모델은 "query: " 접두사를 붙이면 검색 품질이 향상됩니다
         query_text = f"query: {sector_name} 섹터의 최근 동향과 투자 전망 분석"
-        query_vector = embedding_model.encode(query_text).tolist()
+        # 실제 검색 시점에만 임베딩 모델을 로드합니다.
+        model = _get_embedding_model()
+        query_vector = model.encode(query_text).tolist()
         
         # --- 2. Qdrant 검색 (필터 + 스코어 임계값) ---
         search_results = qdrant_client.search(
@@ -246,7 +271,10 @@ def _check_qdrant_collection():
         point_count = collection_info.points_count
         print(f"✅ '{COLLECTION_NAME}' 컬렉션 확인 완료")
         print(f"   저장된 뉴스 개수: {point_count:,}개")
-        print(f"   벡터 차원: {EMBEDDING_DIMENSION}")
+        if EMBEDDING_DIMENSION is not None:
+            print(f"   벡터 차원: {EMBEDDING_DIMENSION}")
+        else:
+            print("   벡터 차원: (임베딩 모델 미로드 — 필요 시 lazy-load 됨)")
     except Exception as e:
         print(f"❌ 컬렉션 확인 실패: {e}")
         print("   → Qdrant URL/API Key를 .env에서 확인하세요.")
