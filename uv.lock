@@ -4006,14 +4006,11 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "qdrant-client" },
     { name = "sentence-transformers" },
-<<<<<<< HEAD
-=======
     { name = "sentencepiece" },
     { name = "streamlit" },
     { name = "tavily-python" },
     { name = "torch" },
     { name = "transformers" },
->>>>>>> 56baef5a635d1274543f9feb71d2f9166120b20e
     { name = "uvicorn", extra = ["standard"] },
     { name = "yfinance" },
 ]
