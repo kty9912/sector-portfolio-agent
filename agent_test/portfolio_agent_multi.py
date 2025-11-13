@@ -51,7 +51,7 @@ class MultiAgentState(TypedDict):
     
     # Supervisor 관련
     next_agent: str                           # 다음 실행할 에이전트
-    discussion_history: Annotated[List[str], operator.add]  # ⭐ 병렬 업데이트 허용
+    discussion_history: List[str]             # ⭐ 일반 리스트로 변경 (supervisor에서만 설정)
     
     # 최종 결과
     portfolio_allocation: List[Dict[str, Any]]
@@ -401,9 +401,11 @@ def financial_agent_node(state: MultiAgentState) -> MultiAgentState:
         }
     
     # ⚠️ 병렬 실행 시 충돌 방지: 자신이 업데이트한 필드만 반환
+    print(f"\n📝 [재무 전문가] 분석 완료, summary 저장됨")
+    
     return {
-        "financial_analysis": financial_analysis,
-        "discussion_history": [f"[재무 전문가] {financial_analysis.get('analysis_summary', '')}"]
+        "financial_analysis": financial_analysis
+        # ⭐ discussion_history는 supervisor에서 한 번에 수집
     }
 
 
@@ -517,9 +519,11 @@ def technical_agent_node(state: MultiAgentState) -> MultiAgentState:
         }
     
     # ⚠️ 병렬 실행 시 충돌 방지: 자신이 업데이트한 필드만 반환
+    print(f"\n📝 [기술 전문가] 분석 완료, summary 저장됨")
+    
     return {
-        "technical_analysis": technical_analysis,
-        "discussion_history": [f"[기술 전문가] {technical_analysis.get('analysis_summary', '')}"]
+        "technical_analysis": technical_analysis
+        # ⭐ discussion_history는 supervisor에서 한 번에 수집
     }
 
 
@@ -631,9 +635,11 @@ def news_agent_node(state: MultiAgentState) -> MultiAgentState:
         }
     
     # ⚠️ 병렬 실행 시 충돌 방지: 자신이 업데이트한 필드만 반환
+    print(f"\n📝 [뉴스 전문가] 분석 완료, summary 저장됨")
+    
     return {
-        "news_analysis": news_analysis,
-        "discussion_history": [f"[뉴스 전문가] {news_analysis.get('analysis_summary', '')}"]
+        "news_analysis": news_analysis
+        # ⭐ discussion_history는 supervisor에서 한 번에 수집
     }
 
 
@@ -729,9 +735,13 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
             "sector": info.get("sector")  # DB의 정확한 섹터명
         }
     
-    print("\n📊 전문가 의견 요약:")
-    for msg in state.get("discussion_history", []):
-        print(f"  {msg}")
+    # ⭐ 디버깅: supervisor 실행 횟수 추적
+    current_history = state.get("discussion_history", [])
+    print(f"\n� [Supervisor 디버깅] discussion_history 개수: {len(current_history)}")
+    
+    print("\n�📊 전문가 의견 요약:")
+    for idx, msg in enumerate(current_history, 1):
+        print(f"  [{idx}] {msg[:80]}...")
     
     print(f"\n📋 종목-섹터 매핑:")
     for ticker, data in ticker_sector_map.items():
@@ -861,12 +871,38 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
         state["performance_metrics"] = {}
         state["chart_data"] = {}
     
+    # ⭐ discussion_history 설정 (3명의 전문가 의견을 한 번에 수집)
+    discussion_history = []
+    
+    if financial.get('analysis_summary'):
+        discussion_history.append(f"[재무 전문가] {financial['analysis_summary']}")
+    
+    if technical.get('analysis_summary'):
+        discussion_history.append(f"[기술 전문가] {technical['analysis_summary']}")
+    
+    if news.get('analysis_summary'):
+        discussion_history.append(f"[뉴스 전문가] {news['analysis_summary']}")
+    
+    state["discussion_history"] = discussion_history
+    print(f"\n📝 [Supervisor] discussion_history 설정 완료: {len(discussion_history)}개")
+    
     return state
 
 
 # =====================================================
 # 멀티 에이전트 그래프 구성
 # =====================================================
+
+def aggregator_node(state: MultiAgentState) -> MultiAgentState:
+    """
+    병렬 실행된 전문가 노드들의 결과를 집계하는 대기 노드
+    LangGraph가 모든 전문가 노드 완료를 기다림 (barrier 역할)
+    """
+    print("\n" + "="*60)
+    print("🔄 [집계 노드] 3명의 전문가 분석 완료, Supervisor로 전달")
+    print("="*60)
+    return {}  # 상태 변경 없음, 단순 통과
+
 
 def build_multi_agent_graph():
     """
@@ -877,7 +913,9 @@ def build_multi_agent_graph():
         ↓
     [financial_agent | technical_agent | news_agent] (병렬 실행)
         ↓
-    supervisor
+    aggregator (barrier: 3개 노드 완료 대기)
+        ↓
+    supervisor (1번만 실행, LLM 호출 1회)
         ↓
     validation (검증)
         ↓
@@ -890,8 +928,9 @@ def build_multi_agent_graph():
     graph.add_node("financial_agent", financial_agent_node)
     graph.add_node("technical_agent", technical_agent_node)
     graph.add_node("news_agent", news_agent_node)
+    graph.add_node("aggregator", aggregator_node)  # ⭐ barrier 노드
     graph.add_node("supervisor", supervisor_node)
-    graph.add_node("validation", validation_node)  # ⭐ 추가
+    graph.add_node("validation", validation_node)
     
     # 엣지 구성
     graph.set_entry_point("initialization")
@@ -901,10 +940,13 @@ def build_multi_agent_graph():
     graph.add_edge("initialization", "technical_agent")
     graph.add_edge("initialization", "news_agent")
     
-    # 3명 모두 완료되면 Supervisor로
-    graph.add_edge("financial_agent", "supervisor")
-    graph.add_edge("technical_agent", "supervisor")
-    graph.add_edge("news_agent", "supervisor")
+    # ⭐ 3명 모두 aggregator로 (LangGraph가 모두 완료될 때까지 대기)
+    graph.add_edge("financial_agent", "aggregator")
+    graph.add_edge("technical_agent", "aggregator")
+    graph.add_edge("news_agent", "aggregator")
+    
+    # ⭐ aggregator → supervisor (1번만 실행!)
+    graph.add_edge("aggregator", "supervisor")
     
     # Supervisor 완료 후 검증
     graph.add_edge("supervisor", "validation")  # ⭐ 수정
