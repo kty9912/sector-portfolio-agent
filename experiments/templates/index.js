@@ -541,8 +541,18 @@ function renderResults(reportText, iterations) {
             </div>
         </div>
         
+        <!-- 투자 책임 경고 -->
+        <div class="disclaimer" style="background: rgba(255, 243, 205, 0.3); border-left: 4px solid #ffc107; border-radius: 8px; padding: 20px; margin-top: 40px;">
+            <p style="color: #495057; font-size: 0.9em; line-height: 1.6; margin: 0;">
+                ⚠️ <strong style="color: #f39c12;">투자 유의사항</strong><br>
+                본 분석 결과는 AI 알고리즘 기반의 참고 자료이며, 투자 권유나 종목 추천이 아닙니다. 
+                과거 데이터와 통계 분석을 기반으로 생성된 정보이므로, 미래 수익을 보장하지 않습니다. 
+                모든 투자 결정과 그에 따른 손익은 투자자 본인의 책임입니다.
+            </p>
+        </div>
+        
         <!-- ⭐ PDF 다운로드 버튼을 맨 아래에 추가 -->
-        <div style="margin-top: 40px;">
+        <div style="margin-top: 20px;">
             <button id="downloadPdfBtn" class="btn-primary">
                 📄 PDF 다운로드
             </button>

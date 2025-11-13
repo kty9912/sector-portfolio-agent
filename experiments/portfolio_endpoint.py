@@ -483,6 +483,20 @@ async def download_pdf(request: dict):
                     font-size: 11px !important;  /* ⭐ 폰트 크기 감소 */
                     font-family: 'Malgun Gothic', Arial, sans-serif !important;
                 }
+                /* 투자 책임 경고 - PDF용 */
+                .disclaimer {
+                    background: #fff3cd !important;
+                    border: 2px solid #ffc107 !important;
+                    border-radius: 8px !important;
+                    padding: 15px !important;
+                    margin-top: 30px !important;
+                    page-break-inside: avoid !important;
+                }
+                .disclaimer p {
+                    font-size: 10px !important;
+                    line-height: 1.5 !important;
+                    color: #333 !important;
+                }
             }
         </style>
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
