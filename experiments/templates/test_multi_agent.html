@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>멀티 에이전트 테스트</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+        }
+        .checkbox-item input {
+            margin-right: 8px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            font-size: 18px;
+        }
+        #result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            display: none;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: #282c34;
+            color: #abb2bf;
+            padding: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+        .success {
+            color: #28a745;
+            font-weight: 600;
+        }
+        .error {
+            color: #dc3545;
+            padding: 15px;
+            background: #fee;
+            border-left: 4px solid #dc3545;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 멀티 에이전트 포트폴리오 분석 테스트</h1>
+        
+        <form id="testForm">
+            <div class="form-group">
+                <label>투자 예산 (원)</label>
+                <input type="number" id="budget" value="50000000" step="1000000" required>
+            </div>
+            
+            <div class="form-group">
+                <label>투자 성향</label>
+                <select id="riskProfile" required>
+                    <option value="안정">안정형</option>
+                    <option value="중립" selected>중립형</option>
+                    <option value="공격">공격형</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>투자 기간</label>
+                <select id="investmentPeriod" required>
+                    <option value="단기">단기 (3개월 이하)</option>
+                    <option value="중기">중기 (3개월~1년)</option>
+                    <option value="장기" selected>장기 (1년 이상)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>섹터 선택</label>
+                <div class="checkbox-group" id="sectorsList">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="sector_반도체" value="반도체" checked>
+                        <label for="sector_반도체">반도체</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="sector_AI" value="AI">
+                        <label for="sector_AI">AI</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="sector_바이오" value="바이오">
+                        <label for="sector_바이오">바이오</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="sector_방산" value="방산">
+                        <label for="sector_방산">방산</label>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" id="analyzeBtn">🚀 분석 시작</button>
+        </form>
+        
+        <div id="loading">
+            <div>⏳ 멀티 에이전트 분석 중...</div>
+            <div style="font-size: 14px; margin-top: 10px; color: #666;">
+                재무 전문가, 기술 전문가, 뉴스 전문가가 분석하고 있습니다.
+            </div>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+    
+    <script>
+        document.getElementById('testForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // UI 상태 변경
+            document.getElementById('analyzeBtn').disabled = true;
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            
+            // 선택된 섹터 수집
+            const selectedSectors = [];
+            document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                selectedSectors.push(cb.value);
+            });
+            
+            if (selectedSectors.length === 0) {
+                alert('최소 1개의 섹터를 선택해주세요.');
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('loading').style.display = 'none';
+                return;
+            }
+            
+            // 요청 데이터 구성
+            const requestData = {
+                budget: parseInt(document.getElementById('budget').value),
+                investment_targets: {
+                    sectors: selectedSectors,
+                    tickers: []
+                },
+                risk_profile: document.getElementById('riskProfile').value,
+                investment_period: document.getElementById('investmentPeriod').value,
+                model_name: "gpt-4o-mini",
+                additional_prompt: "멀티 에이전트 테스트"
+            };
+            
+            console.log('요청 데이터:', requestData);
+            
+            try {
+                const response = await fetch('/api/analyze/multi-agent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                // 결과 표시
+                const resultDiv = document.getElementById('result');
+                resultDiv.style.display = 'block';
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <h2 class="success">✅ 분석 완료!</h2>
+                        <h3 style="margin-top: 20px;">📊 결과:</h3>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h3>❌ 분석 실패</h3>
+                            <p>${result.detail || '알 수 없는 오류'}</p>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <div class="error">
+                        <h3>❌ 요청 실패</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                document.getElementById('result').style.display = 'block';
+            } finally {
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

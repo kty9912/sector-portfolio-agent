@@ -324,7 +324,84 @@ function renderResults(reportText, iterations) {
             <div class="section-title">🎯 AI 종합 브리핑</div>
             <div class="summary-box">` + (data.ai_summary || '분석 요약 정보 없음') + `</div>
         </div>
+    `;
+    
+    // ⭐ 멀티에이전트 전문가 의견 표시 (discussion_history가 있는 경우만)
+    if (data.discussion_history && data.discussion_history.length > 0) {
+        html += `
+        <!-- 1.5. 전문가 분석 의견 -->
+        <div class="section">
+            <div class="section-title">👥 전문가 분석 의견</div>
+            <div style="display: grid; gap: 15px;">
+        `;
         
+        data.discussion_history.forEach((opinion, idx) => {
+            // 전문가 타입 감지 (재무/기술/뉴스)
+            let expertType = '전문가';
+            let expertIcon = '💼';
+            let expertColor = '#667eea';
+            
+            if (opinion.includes('[재무 전문가]') || opinion.includes('Financial Agent')) {
+                expertType = '재무 전문가';
+                expertIcon = '💰';
+                expertColor = '#28a745';
+            } else if (opinion.includes('[기술 전문가]') || opinion.includes('Technical Agent')) {
+                expertType = '기술 전문가';
+                expertIcon = '📊';
+                expertColor = '#007bff';
+            } else if (opinion.includes('[뉴스 전문가]') || opinion.includes('News Agent')) {
+                expertType = '뉴스 전문가';
+                expertIcon = '📰';
+                expertColor = '#dc3545';
+            }
+            
+            // [재무 전문가] 등 태그 제거
+            let cleanOpinion = opinion
+                .replace(/\[재무 전문가\]\s*/g, '')
+                .replace(/\[기술 전문가\]\s*/g, '')
+                .replace(/\[뉴스 전문가\]\s*/g, '')
+                .replace(/Financial Agent:\s*/gi, '')
+                .replace(/Technical Agent:\s*/gi, '')
+                .replace(/News Agent:\s*/gi, '')
+                .trim();
+            
+            html += `
+                <div style="
+                    background: linear-gradient(135deg, ${expertColor}15 0%, ${expertColor}05 100%);
+                    border-left: 4px solid ${expertColor};
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                ">
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        margin-bottom: 10px;
+                        font-weight: 600;
+                        color: ${expertColor};
+                        font-size: 14px;
+                    ">
+                        <span style="font-size: 20px;">${expertIcon}</span>
+                        <span>${expertType}</span>
+                    </div>
+                    <div style="
+                        line-height: 1.6;
+                        color: #333;
+                        font-size: 13px;
+                        white-space: pre-wrap;
+                    ">${cleanOpinion}</div>
+                </div>
+            `;
+        });
+        
+        html += `
+            </div>
+        </div>
+        `;
+    }
+    
+    html += `
         <!-- 2. 성과 지표 -->
         <div class="section">
             <div class="section-title">📈 예상 성과 지표</div>
@@ -588,6 +665,30 @@ function renderResults(reportText, iterations) {
                         .btn-primary { display: none !important; }
                         #downloadPdfBtn { display: none !important; }
                         /* 차트는 이제 표시됩니다! */
+                        
+                        /* ⭐ 전문가 의견 스타일 (PDF용) */
+                        .expert-opinion-card {
+                            background: #f8f9fa;
+                            border-left: 4px solid #667eea;
+                            padding: 12px;
+                            border-radius: 6px;
+                            margin-bottom: 12px;
+                            page-break-inside: avoid;
+                        }
+                        .expert-header {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            margin-bottom: 8px;
+                            font-weight: 600;
+                            font-size: 12px;
+                        }
+                        .expert-content {
+                            line-height: 1.5;
+                            color: #333;
+                            font-size: 10px;
+                            white-space: pre-wrap;
+                        }
                     </style>
                 </head>
                 <body>
