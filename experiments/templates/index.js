@@ -243,7 +243,7 @@ document.getElementById('portfolioForm').addEventListener('submit', async (e) =>
     document.getElementById('analyzeBtn').disabled = true;
     
     // 선택된 엔진 표시
-    const engineDisplay = selectedEngine === 'langgraph' ? '⚡ LangGraph' : '� Anthropic Claude';
+    const engineDisplay = selectedEngine === 'langgraph' ? 'LangGraph' : 'Anthropic';
     const loadingText = document.querySelector('#loadingState p');
     if (loadingText) {
         loadingText.innerHTML = `${engineDisplay} 엔진으로 포트폴리오를 분석하고 있습니다...<br><small>선택된 모델: ${selectedModel}</small>`;
@@ -303,12 +303,14 @@ function renderResults(reportText, iterations) {
         document.getElementById('resultContent').classList.add('active');
         return;
     }
+
+    console.log('data :', data)
     
     // 구조화된 결과 렌더링
     let html = `
         <!-- 1. AI 종합 요약 -->
         <div class="section">
-            <div class="section-title">🎯 AI 종합 브리핑</div>
+            <div class="section-title">AI 종합 브리핑</div>
             <div class="summary-box">` + (data.ai_summary || '분석 요약 정보 없음') + `</div>
         </div>
     `;
@@ -318,27 +320,23 @@ function renderResults(reportText, iterations) {
         html += `
         <!-- 1.5. 전문가 분석 의견 -->
         <div class="section">
-            <div class="section-title">👥 전문가 분석 의견</div>
+            <div class="section-title">전문가 분석 의견</div>
             <div style="display: grid; gap: 15px;">
         `;
         
         data.discussion_history.forEach((opinion, idx) => {
             // 전문가 타입 감지 (재무/기술/뉴스)
             let expertType = '전문가';
-            let expertIcon = '💼';
             let expertColor = '#667eea';
             
             if (opinion.includes('[재무 전문가]') || opinion.includes('Financial Agent')) {
                 expertType = '재무 전문가';
-                expertIcon = '💰';
                 expertColor = '#28a745';
             } else if (opinion.includes('[기술 전문가]') || opinion.includes('Technical Agent')) {
                 expertType = '기술 전문가';
-                expertIcon = '📊';
                 expertColor = '#007bff';
             } else if (opinion.includes('[뉴스 전문가]') || opinion.includes('News Agent')) {
                 expertType = '뉴스 전문가';
-                expertIcon = '📰';
                 expertColor = '#dc3545';
             }
             
@@ -369,7 +367,6 @@ function renderResults(reportText, iterations) {
                         color: ${expertColor};
                         font-size: 14px;
                     ">
-                        <span style="font-size: 20px;">${expertIcon}</span>
                         <span>${expertType}</span>
                     </div>
                     <div style="
@@ -391,7 +388,7 @@ function renderResults(reportText, iterations) {
     html += `
         <!-- 2. 성과 지표 -->
         <div class="section">
-            <div class="section-title">📈 예상 성과 지표</div>
+            <div class="section-title">예상 성과 지표</div>
             <div class="metrics-grid">
     `;
     
@@ -423,7 +420,7 @@ function renderResults(reportText, iterations) {
         
         <!-- 3. 추천 종목 종합표 -->
         <div class="section">
-            <div class="section-title">💼 추천 종목 종합표</div>
+            <div class="section-title">추천 종목 종합표</div>
             <table class="stock-table">
                 <thead>
                     <tr>
@@ -474,7 +471,7 @@ function renderResults(reportText, iterations) {
         
         <!-- 4. 점수 상세 -->
         <div class="section">
-            <div class="section-title">🎯 종목별 점수 분석</div>
+            <div class="section-title">종목별 점수 분석</div>
             <table class="stock-table">
                 <thead>
                     <tr>
@@ -527,7 +524,7 @@ function renderResults(reportText, iterations) {
         
         <!-- 5. 섹터 비중 차트 -->
         <div class="section">
-            <div class="section-title">🌞 포트폴리오 구성</div>
+            <div class="section-title">포트폴리오 구성</div>
             <div class="chart-container" id="chartContainer">
                 <div id="sectorChart" style="height: 400px; width: 100%;"></div>
             </div>
@@ -535,7 +532,7 @@ function renderResults(reportText, iterations) {
         
         <!-- 6. 예상 수익률 차트 -->
         <div class="section">
-            <div class="section-title">📊 예상 수익률 추이</div>
+            <div class="section-title">예상 수익률 추이</div>
             <div class="chart-container">
                 <div id="performanceChart" style="height: 400px; width: 100%;"></div>
             </div>
@@ -554,7 +551,7 @@ function renderResults(reportText, iterations) {
         <!-- ⭐ PDF 다운로드 버튼을 맨 아래에 추가 -->
         <div style="margin-top: 20px;">
             <button id="downloadPdfBtn" class="btn-primary">
-                📄 PDF 다운로드
+                PDF 다운로드
             </button>
         </div>
     `;
@@ -689,7 +686,7 @@ function renderResults(reportText, iterations) {
                     </style>
                 </head>
                 <body>
-                    <h1>🤖 AI 투자 포트폴리오 분석 보고서</h1>
+                    <h1>AI 투자 포트폴리오 분석 보고서</h1>
                     <p style="text-align: center; color: #666; margin-bottom: 40px;">
                         생성일시: ${new Date().toLocaleString('ko-KR')}
                     </p>
