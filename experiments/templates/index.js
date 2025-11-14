@@ -34,7 +34,6 @@ async function loadSectors() {
             </div>
         `).join('');
     } catch (error) {
-        console.error('❌ 섹터 로드 실패:', error);
         const sectorsList = document.getElementById('sectorsList');
         if (sectorsList) {
             sectorsList.innerHTML = '<p style="color: red;">섹터 로드 실패: ' + error.message + '</p>';
@@ -45,7 +44,6 @@ async function loadSectors() {
 // 종목 리스트 로드
 async function loadStocks() {
     try {
-        console.log('[LOADING] 종목 목록 로드 중...');
         const response = await fetch('/api/stocks');
         
         if (!response.ok) {
@@ -53,7 +51,6 @@ async function loadStocks() {
         }
         
         const data = await response.json();
-        console.log('✅ 종목 데이터 수신:', data);
         
         const stocksList = document.getElementById('stocksList');
         if (!stocksList) {
@@ -66,10 +63,7 @@ async function loadStocks() {
                 <label for="stock_` + stock.ticker + `">` + stock.name + `</label>
             </div>
         `).join('');
-        
-        console.log(`✅ 종목 ${data.stocks.length}개 로드 완료`);
     } catch (error) {
-        console.error('❌ 종목 로드 실패:', error);
         const stocksList = document.getElementById('stocksList');
         if (stocksList) {
             stocksList.innerHTML = '<p style="color: red;">종목 로드 실패: ' + error.message + '</p>';
@@ -80,7 +74,6 @@ async function loadStocks() {
 // 사용 가능한 모델 목록 로드
 async function loadAvailableModels() {
     try {
-        console.log('🔄 사용 가능한 모델 목록 로딩...');
         const response = await fetch('/api/models');
         
         if (!response.ok) {
@@ -88,11 +81,8 @@ async function loadAvailableModels() {
         }
         
         const data = await response.json();
-        console.log('✅ 모델 데이터 수신:', data);
-        
         return data.models;
     } catch (error) {
-        console.error('❌ 모델 로드 실패:', error);
         return ['claude-3-5-sonnet-20241022']; // 기본 fallback
     }
 }
@@ -102,20 +92,15 @@ async function updateModelOptions() {
     const selectedEngine = document.querySelector('input[name="aiEngine"]:checked').value;
     const modelSelect = document.getElementById('modelSelect');
     
-    // 로딩 표시
     modelSelect.innerHTML = '<option value="">모델 로딩 중...</option>';
     
     try {
         const availableModels = await loadAvailableModels();
         
-        // 백엔드의 AVAILABLE_MODELS만 사용 (하드코딩 제거)
         modelSelect.innerHTML = availableModels.map(model => 
             `<option value="${model}">${getModelDisplayName(model)}</option>`
         ).join('');
-        
-        console.log(`✅ ${selectedEngine} 엔진용 모델 목록 업데이트 완료`);
     } catch (error) {
-        console.error('❌ 모델 목록 업데이트 실패:', error);
         modelSelect.innerHTML = '<option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (기본)</option>';
     }
 }
@@ -184,7 +169,6 @@ const LoadingController = {
             const complexity = this.calculateComplexity(requestData);
             this.estimatedDuration = this.getEstimatedTime(complexity);
         } else {
-            // 기본 예상 시간
             this.estimatedDuration = 20000
         }
         
@@ -196,20 +180,15 @@ const LoadingController = {
         if (stepMessageEl) {
             const initialTime = Math.ceil(this.estimatedDuration / 1000);
             const initialMessage = `${this.stepMessages[0]} (${initialTime}초 남음)`;
-            console.log(`🚀 초기 메시지 설정: ${this.stepMessages[0]} (${initialTime}초)`);
             stepMessageEl.textContent = initialMessage;
         }
         
         if (progressFill) progressFill.style.width = '0%';
         if (progressText) progressText.textContent = '0%';
         
-        // 첫 번째 단계 설정
         this.currentStep = 0;
         
-        // 동적 진행률 업데이트 시작
         this.startProgressAnimation();
-        
-        // 시간 표시 시작
         this.startTimeEstimation();
     },
     
@@ -220,8 +199,6 @@ const LoadingController = {
             if (stepMessageEl) {
                 const message = this.stepMessages[stepIndex];
                 const remainingTime = this.getRemainingTime();
-                
-                console.log(`🔄 단계 변경: ${stepIndex + 1}단계 - ${message}, 남은 시간: ${remainingTime}초`);
                 
                 if (remainingTime > 0 && this.progress < 95) {
                     stepMessageEl.textContent = `${message} (${remainingTime}초 남음)`;
@@ -238,19 +215,12 @@ const LoadingController = {
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
         
-        console.log(`📊 진행률 업데이트: ${percent}%`);
-        
         if (progressFill) {
             progressFill.style.width = `${percent}%`;
-            console.log(`✅ 프로그레스 바 너비 설정: ${percent}%`);
-        } else {
-            console.error('❌ progressFill 요소를 찾을 수 없음');
         }
         
         if (progressText) {
             progressText.textContent = `${Math.round(percent)}%`;
-        } else {
-            console.error('❌ progressText 요소를 찾을 수 없음');
         }
         
         // 진행률에 따라 단계 활성화 (12단계)
@@ -365,8 +335,6 @@ const LoadingController = {
             const message = this.stepMessages[this.currentStep];
             const remainingTime = this.getRemainingTime();
             
-            console.log(`⏱️ 시간 업데이트: ${message}, 남은 시간: ${remainingTime}초`);
-            
             if (remainingTime > 0) {
                 stepMessageEl.textContent = `${message} (${remainingTime}초 남음)`;
             } else {
@@ -383,40 +351,31 @@ const LoadingController = {
     calculateComplexity: function(requestData) {
         let complexity = 1;
         
-        // 선택된 섹터/주식 수에 따른 복잡도
         const sectors = requestData.investment_targets?.sectors || [];
         const stocks = requestData.investment_targets?.tickers || [];
         const totalItems = sectors.length + stocks.length;
         complexity += totalItems * 0.2;
         
-        // 예산 크기에 따른 복잡도
         if (requestData.budget) {
             const amount = requestData.budget;
-            if (amount > 100000000) complexity += 0.5; // 1억 이상
-            if (amount > 500000000) complexity += 0.3; // 5억 이상
+            if (amount > 100000000) complexity += 0.5;
+            if (amount > 500000000) complexity += 0.3;
         }
         
-        // 투자 기간에 따른 복잡도
         if (requestData.investment_period === 'long') {
-            complexity += 0.2; // 장기투자는 더 복잡한 분석 필요
+            complexity += 0.2;
         }
         
-        // 리스크 프로필에 따른 복잡도
         if (requestData.risk_profile === 'conservative') {
-            complexity += 0.3; // 보수적 투자는 더 신중한 분석 필요
+            complexity += 0.3;
         }
         
-        console.log(`💡 복잡도 계산: 기본(1) + 항목수(${totalItems}*0.1) + 예산보너스 + 기타 = ${complexity.toFixed(2)}`);
-        
-        return Math.min(complexity, 3); // 최대 3배
+        return Math.min(complexity, 3);
     },
     
     // 예상 시간 계산
     getEstimatedTime: function(complexity) {
         const estimatedTime = 18000 * complexity;
-        
-        console.log(`⏱️ 예상 시간 계산: 기본시간(18초) × 복잡도(${complexity.toFixed(2)}) = ${(estimatedTime/1000).toFixed(1)}초`);
-        
         return estimatedTime;
     }
 };
@@ -484,10 +443,9 @@ async function handleRegularRequest(apiEndpoint, requestData, selectedEngine) {
 
 // ⭐ DOM이 완전히 로드된 후 초기 함수 실행
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[OK] DOM 로드 완료 - 초기 함수 실행');
     loadSectors();
     loadStocks();
-    updateModelOptions(); // 초기 모델 목록 로드
+    updateModelOptions();
     
     // 예산 input 초기화
     const budgetInput = document.getElementById('budgetInput');
@@ -575,13 +533,10 @@ document.getElementById('portfolioForm').addEventListener('submit', async (e) =>
     const engineDisplay = selectedEngine === 'langgraph' ? 'LangGraph' : 'Anthropic';
 
     try {
-        console.log(`🚀 ${engineDisplay} 엔진으로 요청 전송:`, apiEndpoint);
-        
         // 스마트 추정 방식으로 요청 처리
         await handleRegularRequest(apiEndpoint, requestData, selectedEngine);
         
     } catch (error) {
-        // 에러 발생 시 로딩 완료 처리
         LoadingController.complete();
         
         document.getElementById('resultContent').innerHTML = `
@@ -592,11 +547,10 @@ document.getElementById('portfolioForm').addEventListener('submit', async (e) =>
         `;
         document.getElementById('resultContent').classList.add('active');
     } finally {
-        // 로딩 상태 숨기기
         setTimeout(() => {
             document.getElementById('loadingState').style.display = 'none';
             document.getElementById('analyzeBtn').disabled = false;
-        }, 1000); // 로딩 완료 애니메이션을 볼 수 있도록 잠시 대기
+        }, 1000);
     }
 });
 
@@ -624,8 +578,6 @@ function renderResults(reportText, iterations) {
         document.getElementById('resultContent').classList.add('active');
         return;
     }
-
-    console.log('data :', data)
     
     // 구조화된 결과 렌더링
     let html = `
@@ -1043,39 +995,18 @@ function renderResults(reportText, iterations) {
         }
     });
     
-    // ⭐ DOM이 완전히 렌더링된 후 차트 삽입
     setTimeout(() => {
-        console.log('=== 차트 렌더링 시작 ===');
-        
-        // ⭐ 방법 1: chart_config로 안전하게 렌더링 (우선)
-        if (data.chart_config) {
-            renderSunburstFromConfig(data.chart_config);
-            
-        // ⭐ 방법 2: chart_html 백업 (기존 방식)
-        } else if (data.chart_html) {
-            const sectorChart = document.getElementById('sectorChart');
-            if (sectorChart) {
-                // iframe으로 안전하게 삽입
-                const escapedHtml = data.chart_html.replace(/"/g, '&quot;');
-                sectorChart.innerHTML = `<iframe srcdoc="` + escapedHtml + `" style="width:100%; height:430px; border:none;"></iframe>`;
-            }
-            
-        // ⭐ 방법 3: 포트폴리오 데이터로 직접 생성 (최후의 수단)
-        } else {
-            createSunburstFromData(data.portfolio_allocation);
-        }
-        
-        console.log('=== 차트 렌더링 종료 ===');
-        
-        // 수익률 차트 렌더링
-        setTimeout(() => {
-            renderPerformanceChart(data);
-        }, 100);
+        renderSunburstFromConfig(data.chart_config);
+        renderPerformanceChart(data);
     }, 300);
 }
 
 // ⭐ renderResults 함수 끝
 function renderSunburstFromConfig(config) {
+    if (!config) {
+        createSunburstFromData(data.portfolio_allocation);
+        return;
+    }
     
     try {
         const chartData = [{
@@ -1112,24 +1043,16 @@ function renderSunburstFromConfig(config) {
             staticPlot: false
         });
         
-        console.log('[OK] Plotly.newPlot으로 3단계 차트 생성 완료');
-        
     } catch (e) {
-        console.error('❌ renderSunburstFromConfig 오류:', e);
-        // 오류 시 백업 방법 사용
         createSunburstFromData(data.portfolio_allocation);
     }
 }
 
 // ⭐ Sunburst 차트를 직접 생성하는 함수 (백업용) - 3단계 구조
 function createSunburstFromData(portfolio) {
-    
     if (!portfolio || portfolio.length === 0) {
-        console.error('❌ portfolio_allocation이 비어있습니다');
         return;
     }
-    
-    console.log(`✅ portfolio 데이터 있음 (${portfolio.length}개 종목)`);
     
     const colorMap = {
         '반도체': '#4A5FC1',
@@ -1173,28 +1096,21 @@ function createSunburstFromData(portfolio) {
         sectorMap[sector].push(stock);
     });
     
-    // === 3단계 구조: 포트폴리오 → 섹터 → 종목 ===
-    
     // 1. 루트 노드 "포트폴리오" 추가
     const totalPortfolioValue = portfolio.reduce((sum, stock) => sum + ((stock.weight || 0) * 100), 0);
     labels.push('포트폴리오');
-    parents.push('');  // 최상위 루트
+    parents.push('');
     values.push(totalPortfolioValue);
-    colors.push('#FFFFFF');  // 포트폴리오 색상 (흰색)
-    
-    console.log(`포트폴리오 총 비중: ${totalPortfolioValue.toFixed(1)}%`);
+    colors.push('#FFFFFF');
     
     // 2. 섹터들 추가 (부모: 포트폴리오)
     Object.entries(sectorMap).forEach(([sector, stocks]) => {
         labels.push(sector);
-        parents.push('포트폴리오');  // 부모는 포트폴리오
+        parents.push('포트폴리오');
         
-        // 섹터 총 비중 계산
         const sectorTotal = stocks.reduce((sum, stock) => sum + ((stock.weight || 0) * 100), 0);
         values.push(sectorTotal);
         colors.push(colorMap[sector] || '#1B8B8B');
-        
-        console.log(`섹터: ${sector} (${sectorTotal.toFixed(1)}%)`);
     });
     
     // 3. 종목들 추가 (부모: 각 섹터)
@@ -1204,15 +1120,12 @@ function createSunburstFromData(portfolio) {
             const stockWeight = (stock.weight || 0) * 100;
             
             labels.push(stockName);
-            parents.push(sector);  // 부모는 섹터
+            parents.push(sector);
             values.push(stockWeight);
             
-            // 밝은 색상
             const baseColor = colorMap[sector] || '#1B8B8B';
             const lighterColor = lightenColor(baseColor, idx);
             colors.push(lighterColor);
-            
-            console.log(`  - ${stockName}: ${stockWeight.toFixed(1)}% (${lighterColor})`);
         });
     });
     
@@ -1251,30 +1164,23 @@ function createSunburstFromData(portfolio) {
             displayModeBar: false,
             staticPlot: false
         });
-        console.log('[OK] 3단계 Sunburst 차트 생성 완료 (클라이언트 백업)');
     } catch (e) {
-        console.error('[ERROR] Plotly.newPlot 오류:', e);
+        // Error handling
     }
 }
 
 // ⭐ 수익률 차트 전용 함수 - Plotly.js로 변경
 function renderPerformanceChart(data) {
-    
     const perfContainer = document.getElementById('performanceChart');
     if (!perfContainer) {
-        console.error('❌ performanceChart 요소를 찾을 수 없습니다');
         return;
     }
     
-    // ⭐ 안전한 데이터 접근
     let perfData = null;
     
-    // 방법 1: data.chart_data.expected_performance
     if (data.chart_data && data.chart_data.expected_performance) {
         perfData = data.chart_data.expected_performance;
-    }
-    // 방법 2: 직접 접근 (months, portfolio, benchmark가 직접 있는 경우)
-    else if (data.months && data.portfolio && data.benchmark) {
+    } else if (data.months && data.portfolio && data.benchmark) {
         perfData = {
             months: data.months,
             portfolio: data.portfolio,
@@ -1282,9 +1188,7 @@ function renderPerformanceChart(data) {
         };
     }
     
-    // 데이터가 없는 경우: 오류 메시지 표시
     if (!perfData) {
-        console.warn('⚠️ 수익률 데이터 없음 - 오류 메시지 표시');
         perfContainer.innerHTML = `
             <div style="
                 display: flex; 
@@ -1306,8 +1210,6 @@ function renderPerformanceChart(data) {
         `;
         return;
     }
-    
-    console.log('✅ performanceChart 발견, Plotly 차트 생성 중...');
     
     try {
         // Plotly 라인 차트 데이터
@@ -1354,7 +1256,7 @@ function renderPerformanceChart(data) {
         ];
         
         const layout = {
-            margin: { l: 60, r: 20, t: 60, b: 80 },  // ⭐ 하단 여백 증가 (tick 레이블 공간)
+            margin: { l: 60, r: 20, t: 60, b: 80 },
             font: { 
                 family: 'Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif', 
                 size: 12 
@@ -1363,12 +1265,12 @@ function renderPerformanceChart(data) {
             plot_bgcolor: 'rgba(0,0,0,0)',
             autosize: true,
             width: null,
-            height: 400,  // ⭐ 390 → 400으로 10px 증가
+            height: 400,
             xaxis: {
                 title: {
                     text: '투자 기간',
                     font: { size: 14, color: '#333' },
-                    standoff: 15  // ⭐ 제목과 tick 간격 (원래대로)
+                    standoff: 15
                 },
                 showgrid: true,
                 gridcolor: 'rgba(0,0,0,0.1)',
@@ -1376,8 +1278,8 @@ function renderPerformanceChart(data) {
                 tickfont: { size: 11 },
                 tickangle: 0,
                 tickmode: 'linear',
-                ticklen: 8,  // ⭐ tick 길이 (기본 5 → 8)
-                tickcolor: 'rgba(0,0,0,0.2)'  // ⭐ tick 색상
+                ticklen: 8,
+                tickcolor: 'rgba(0,0,0,0.2)'
             },
             yaxis: {
                 title: {
@@ -1391,11 +1293,11 @@ function renderPerformanceChart(data) {
                 ticksuffix: '%'
             },
             legend: {
-                x: 0.5,  // ⭐ 중앙
-                y: 1.12,  // ⭐ 그래프 상단 위 (양수 = 위쪽)
+                x: 0.5,
+                y: 1.12,
                 xanchor: 'center',
-                yanchor: 'bottom',  // ⭐ legend의 아래쪽 기준
-                orientation: 'h',  // 가로 방향
+                yanchor: 'bottom',
+                orientation: 'h',
                 bgcolor: 'rgba(255,255,255,0.9)',
                 bordercolor: '#ddd',
                 borderwidth: 1,
@@ -1404,16 +1306,13 @@ function renderPerformanceChart(data) {
             showlegend: true
         };
         
-        // Plotly로 차트 생성
         Plotly.newPlot('performanceChart', chartData, layout, {
             responsive: true,
             displayModeBar: false,
             staticPlot: false
         });
         
-        console.log('✅ Plotly 수익률 차트 생성 완료');
-        
     } catch (e) {
-        console.error('❌ Plotly 수익률 차트 생성 오류:', e);
+        // Error handling
     }
 }
