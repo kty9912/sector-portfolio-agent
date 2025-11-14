@@ -3,10 +3,15 @@ import pandas as pd
 import yfinance as yf
 from core.db import exec_sql, exec_many, fetch_all
 
-# --- (윈도우 한글 경로 TLS 이슈 방지) ---
-os.environ.setdefault("SSL_CERT_FILE", r"C:\certs\cacert.pem")
-os.environ.setdefault("REQUESTS_CA_BUNDLE", r"C:\certs\cacert.pem")
-os.environ.setdefault("CURL_CA_BUNDLE", r"C:\certs\cacert.pem")
+# --- 한글 경로 문제 해결: 인증서 경로 설정 ---
+CERT_PATH = r"C:\certs\cacert.pem"
+if os.path.exists(CERT_PATH):
+    os.environ['CURL_CA_BUNDLE'] = CERT_PATH
+    os.environ['SSL_CERT_FILE'] = CERT_PATH
+    os.environ['REQUESTS_CA_BUNDLE'] = CERT_PATH
+else:
+    print(f"⚠️ 경고: {CERT_PATH} 파일이 없습니다. yfinance가 작동하지 않을 수 있습니다.")
+    print("해결: python experiments/fix_cert_path.py 실행")
 
 # --- 테이블 생성 (없으면) ---
 CREATE_FUNDAMENTALS = """
@@ -117,6 +122,14 @@ def _extract_blocks(tkr: yf.Ticker, quarterly=False):
         def get(df, key):
             try: return df.loc[idx, key]
             except Exception: return None
+        
+        # 다중 필드명 시도 (yfinance 필드명 변경 대응)
+        def get_multi(df, *keys):
+            for key in keys:
+                val = get(df, key)
+                if val is not None:
+                    return val
+            return None
 
         rows.append(dict(
             fiscal_date = pd.to_datetime(idx).date(),
@@ -126,10 +139,10 @@ def _extract_blocks(tkr: yf.Ticker, quarterly=False):
             net_income = _to_float(get(fin, "Net Income")),
             ebitda = _to_float(get(fin, "EBITDA")),
             total_assets = _to_float(get(bs, "Total Assets")),
-            total_liab   = _to_float(get(bs, "Total Liab")),
-            equity       = _to_float(get(bs, "Total Stockholder Equity")),
-            cash_from_ops = _to_float(get(cf, "Total Cash From Operating Activities")) if not cf.empty else None,
-            capex         = _to_float(get(cf, "Capital Expenditures")) if not cf.empty else None,
+            total_liab   = _to_float(get_multi(bs, "Total Liabilities Net Minority Interest", "Total Liab")),
+            equity       = _to_float(get_multi(bs, "Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity")),
+            cash_from_ops = _to_float(get_multi(cf, "Operating Cash Flow", "Total Cash From Operating Activities")) if not cf.empty else None,
+            capex         = _to_float(get_multi(cf, "Capital Expenditure", "Capital Expenditures")) if not cf.empty else None,
         ))
     return rows
 

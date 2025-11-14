@@ -11,38 +11,38 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 AI 투자 포트폴리오 분석 시스템</h1>
+            <h1>AI 투자 포트폴리오 분석 시스템</h1>
             <p>고도화된 데이터 기반 투자 전략 분석</p>
         </div>
         
         <div class="main-content">
             <!-- 입력 패널 -->
             <div class="panel input-panel">
-                <h2>📝 투자 조건 입력</h2>
+                <h2>투자 조건 입력</h2>
                 
                 <form id="portfolioForm">
                     <!-- 0. AI 엔진 및 모델 선택 -->
                     <div class="form-group">
-                        <label>🤖 AI 분석 엔진</label>
+                        <label>AI 분석 엔진</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                             <div class="ai-engine-option">
-                                <input type="radio" id="anthropic" name="aiEngine" value="anthropic" checked>
+                                <input type="radio" id="anthropic" name="aiEngine" value="anthropic">
                                 <label for="anthropic" class="engine-label">
-                                    <div class="engine-title">🌟 Anthropic</div>
+                                    <div class="engine-title">Anthropic</div>
                                     <div class="engine-desc">빠르고 안정적인 분석</div>
                                 </label>
                             </div>
                             <div class="ai-engine-option">
-                                <input type="radio" id="langgraph" name="aiEngine" value="langgraph">
+                                <input type="radio" id="langgraph" name="aiEngine" value="langgraph" checked>
                                 <label for="langgraph" class="engine-label">
-                                    <div class="engine-title">⚡ LangGraph</div>
+                                    <div class="engine-title">LangGraph</div>
                                     <div class="engine-desc">고급 그래프 기반 분석</div>
                                 </label>
                             </div>
                         </div>
                         
                         <!-- 모델 선택 -->
-                        <label>🎯 분석 모델</label>
+                        <label>분석 모델</label>
                         <select id="modelSelect" name="model" style="width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #e9ecef; font-size: 1em;">
                             <option value="">모델을 로딩 중...</option>
                         </select>
@@ -50,20 +50,20 @@
                     
                     <!-- 1. 투자 예산 -->
                     <div class="form-group">
-                        <label>💰 총 투자 예산 (원)</label>
+                        <label>총 투자 예산 (원)</label>
                         <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="number" id="budgetInput" name="budget" value="5000000" 
+                            <input type="number" id="budgetInput" name="budget" value="50000000" 
                                    min="1000000" step="10000" required
                                    style="flex: 1; font-size: 1.05em; text-align: right;">
                             <span id="budgetDisplay" style="min-width: 140px; font-weight: 600; color: #667eea; text-align: right; padding: 12px 15px; background: #f8f9fa; border-radius: 8px; border: 2px solid #e9ecef; font-size: 1.1em; white-space: nowrap;">
-                                5백만원
+                                <!-- JavaScript로 업데이트됨 -->
                             </span>
                         </div>
                     </div>
                     
                     <!-- 2. 투자 대상 -->
                     <div class="form-group">
-                        <label>🎯 투자 대상</label>
+                        <label>투자 대상</label>
                         <div class="tabs">
                             <button type="button" class="tab active" data-tab="sectors">섹터 선택</button>
                             <button type="button" class="tab" data-tab="stocks">종목 선택</button>
@@ -82,7 +82,7 @@
                     
                     <!-- 3. 투자 성향 -->
                     <div class="form-group">
-                        <label>⚖️ 투자 위험 성향</label>
+                        <label>투자 위험 성향</label>
                         <select name="risk_profile" required>
                             <option value="안정">안정 (낮은 변동성, 안전 자산 선호)</option>
                             <option value="중립">중립 (균형 잡힌 포트폴리오)</option>
@@ -92,7 +92,7 @@
                     
                     <!-- 4. 투자 기간 -->
                     <div class="form-group">
-                        <label>📅 투자 기간</label>
+                        <label>투자 기간</label>
                         <select name="investment_period" required>
                             <option value="단기">단기 (3개월 이하)</option>
                             <option value="중기" selected>중기 (3개월~12개월)</option>
@@ -102,20 +102,20 @@
                     
                     <!-- 5. 추가 프롬프트 -->
                     <div class="form-group">
-                        <label>💬 추가 요구사항 (선택)</label>
+                        <label>추가 요구사항 (선택)</label>
                         <textarea name="additional_prompt" 
                                   placeholder="예: ESG 점수가 높은 종목 우선, 배당 수익 중시 등"></textarea>
                     </div>
                     
                     <button type="submit" class="btn-primary" id="analyzeBtn">
-                        🚀 포트폴리오 분석 시작
+                        포트폴리오 분석 시작
                     </button>
                 </form>
             </div>
             
             <!-- 결과 패널 -->
             <div class="panel result-panel">
-                <h2>📊 분석 결과</h2>
+                <h2>분석 결과</h2>
                 
                 <div id="emptyState" class="empty-state">
                     <svg viewBox="0 0 24 24" fill="currentColor">
@@ -126,11 +126,39 @@
                 </div>
                 
                 <div id="loadingState" class="loading" style="display: none;">
-                    <div class="spinner"></div>
-                    <h3>AI가 포트폴리오를 분석하고 있습니다...</h3>
-                    <p style="margin-top: 10px; color: #666;">
-                        데이터 수집 → 점수 계산 → 최적화 → 보고서 생성
-                    </p>
+                    <!-- 메인 로딩 애니메이션 -->
+                    <div class="loading-animation">
+                        <div class="brain-icon">
+                            <svg viewBox="0 0 100 100" width="80" height="80">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#667eea" stroke-width="3" opacity="0.2"/>
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#667eea" stroke-width="3" stroke-linecap="round" class="loading-circle"/>
+                                <text x="50" y="58" text-anchor="middle" fill="#667eea" font-size="24" font-weight="bold">AI</text>
+                            </svg>
+                        </div>
+                        <div class="pulse-rings">
+                            <div class="pulse-ring ring-1"></div>
+                            <div class="pulse-ring ring-2"></div>
+                            <div class="pulse-ring ring-3"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 로딩 텍스트 -->
+                    <div class="loading-text">
+                        <!-- 단계 메시지 -->
+                        <div class="loading-steps">
+                            <div class="step-message" id="stepMessage">데이터를 수집하고 있습니다</div>
+                        </div>
+                        
+                        <!-- 진행률 바 -->
+                        <div class="progress-section">
+                            <div class="progress-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                                <div class="progress-text" id="progressText">0%</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div id="resultContent" class="result-content"></div>
