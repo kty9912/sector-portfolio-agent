@@ -199,21 +199,21 @@ body {
 }
 
 .btn-secondary {
-    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     color: white;
     border: none;
-    padding: 12px 20px;
+    padding: 10px 20px;
     border-radius: 8px;
     font-size: 0.95em;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    font-weight: 600;
     white-space: nowrap;
 }
 
 .btn-secondary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
 .result-panel {
@@ -282,7 +282,6 @@ body {
 
 .summary-box {
     background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-    border-left: 4px solid #667eea;
     padding: 20px;
     border-radius: 10px;
     font-size: 1.05em;
@@ -456,7 +455,6 @@ body {
     border-radius: 8px;
     padding: 20px;
     margin-top: 40px;
-    border-left: 4px solid #ffc107;
 }
 
 .disclaimer p {

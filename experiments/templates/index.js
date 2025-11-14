@@ -623,10 +623,22 @@ function renderResults(reportText, iterations) {
                 .replace(/News Agent:\s*/gi, '')
                 .trim();
             
+            // 색상 HEX를 RGB로 변환
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : null;
+            };
+            
+            const rgb = hexToRgb(expertColor);
+            const bgColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)` : 'rgba(128, 128, 128, 0.08)';
+            
             html += `
                 <div style="
-                    background: linear-gradient(135deg, ${expertColor}15 0%, ${expertColor}05 100%);
-                    border-left: 4px solid ${expertColor};
+                    background: ${bgColor};
                     padding: 15px;
                     border-radius: 8px;
                     margin-bottom: 10px;
@@ -812,7 +824,7 @@ function renderResults(reportText, iterations) {
         </div>
         
         <!-- 투자 책임 경고 -->
-        <div class="disclaimer" style="background: rgba(255, 243, 205, 0.3); border-left: 4px solid #ffc107; border-radius: 8px; padding: 20px; margin-top: 40px;">
+        <div class="disclaimer" style="background: rgba(255, 243, 205, 0.3); border-radius: 8px; padding: 20px; margin-top: 40px;">
             <p style="color: #495057; font-size: 0.9em; line-height: 1.6; margin: 0;">
                 ⚠️ <strong style="color: #f39c12;">투자 유의사항</strong><br>
                 본 분석 결과는 AI 알고리즘 기반의 참고 자료이며, 투자 권유나 종목 추천이 아닙니다. 
@@ -866,7 +878,6 @@ function renderResults(reportText, iterations) {
                         }
                         .summary-box {
                             background: #f8f9fa;
-                            border-left: 4px solid #667eea;
                             padding: 15px;
                             margin: 10px 0;
                             line-height: 1.6;
@@ -936,7 +947,6 @@ function renderResults(reportText, iterations) {
                         /* ⭐ 전문가 의견 스타일 (PDF용) */
                         .expert-opinion-card {
                             background: #f8f9fa;
-                            border-left: 4px solid #667eea;
                             padding: 12px;
                             border-radius: 6px;
                             margin-bottom: 12px;

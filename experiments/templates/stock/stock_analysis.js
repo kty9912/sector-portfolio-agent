@@ -207,19 +207,64 @@ function renderResults(data) {
     const thesis = data.investment_thesis || {};
     const recommendation = data.recommendation || {};
     
+    // 투자 의견 배지 색상 결정
+    const getRatingBadge = (rating) => {
+        const ratingUpper = (rating || '').toUpperCase();
+        let bgColor, textColor, text;
+        
+        if (ratingUpper.includes('강력 매수') || ratingUpper.includes('STRONG BUY')) {
+            bgColor = '#059669';
+            textColor = '#ffffff';
+            text = '강력 매수';
+        } else if (ratingUpper.includes('매수') || ratingUpper.includes('BUY')) {
+            bgColor = '#10b981';
+            textColor = '#ffffff';
+            text = '매수';
+        } else if (ratingUpper.includes('보유') || ratingUpper.includes('HOLD')) {
+            bgColor = '#f59e0b';
+            textColor = '#ffffff';
+            text = '보유';
+        } else if (ratingUpper.includes('매도') || ratingUpper.includes('SELL')) {
+            bgColor = '#ef4444';
+            textColor = '#ffffff';
+            text = '매도';
+        } else {
+            bgColor = '#6b7280';
+            textColor = '#ffffff';
+            text = rating || 'N/A';
+        }
+        
+        return `<span style="
+            display: inline-block;
+            background: ${bgColor};
+            color: ${textColor};
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 10px;
+            vertical-align: middle;
+        ">${text}</span>`;
+    };
+    
     let html = `
-        <!-- 기본 정보 -->
-        <div class="section">
-            <div class="section-title">📊 기본 정보</div>
-            <div class="summary-box">
-                <h3 style="margin-bottom: 15px; font-size: 1.5em;">${basic.name_kr || '종목명'}</h3>
-                <p><strong>티커:</strong> ${basic.ticker || '-'}</p>
-                <p><strong>시장:</strong> ${basic.market || '-'}</p>
-                <p><strong>업종:</strong> ${basic.industry || '-'}</p>
-                <p><strong>시가총액:</strong> ${basic.market_cap_level || '-'}</p>
-                <p style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
-                    ${basic.summary_sentence || ''}
-                </p>
+        <!-- 헤더 섹션 -->
+        <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            color: white;
+        " class="stock-header">
+            <div style="font-size: 2.2em; font-weight: 700; margin-bottom: 10px;">
+                ${basic.name_kr || '종목명'}
+                ${getRatingBadge(recommendation.rating)}
+            </div>
+            <div style="font-size: 1.1em; opacity: 0.95; margin-bottom: 15px;">
+                ${basic.ticker || '-'} | ${basic.market || '-'} | ${basic.industry || '-'}
+            </div>
+            <div style="font-size: 1.05em; line-height: 1.7; opacity: 0.9; margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2);">
+                ${basic.summary_sentence || ''}
             </div>
         </div>
         
@@ -227,10 +272,7 @@ function renderResults(data) {
         <div class="section">
             <div class="section-title">🎯 투자 추천</div>
             <div class="summary-box" style="background: #ffffff; padding: 30px;">
-                <h3 style="font-size: 2em; margin-bottom: 20px; text-align: center;">
-                    투자의견: <strong>${recommendation.rating || 'N/A'}</strong>
-                </h3>
-                <div class="metrics-grid" style="margin-top: 20px;">
+                <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-label">목표주가</div>
                         <div class="metric-value" style="font-size: 1.5em;">${recommendation.target_price_range || 'N/A'}</div>
@@ -423,17 +465,17 @@ function renderResults(data) {
         <!-- 투자 시나리오 -->
         <div class="section">
             <div class="section-title">🎯 향후 12개월 시나리오</div>
-            <div class="summary-box" style="background: #f0fdf4; border-left: 4px solid #22c55e; margin-bottom: 15px;">
+            <div class="summary-box" style="background: #f0fdf4; margin-bottom: 15px;">
                 <h4 style="color: #166534; margin-bottom: 8px;">🚀 강세 시나리오</h4>
                 <p>${scenarios.bull_case?.description || 'N/A'}</p>
                 <p style="margin-top: 8px;"><strong>예상 수익률:</strong> ${scenarios.bull_case?.expected_return_range || 'N/A'}</p>
             </div>
-            <div class="summary-box" style="background: #fffbeb; border-left: 4px solid #f59e0b; margin-bottom: 15px;">
+            <div class="summary-box" style="background: #fffbeb; margin-bottom: 15px;">
                 <h4 style="color: #92400e; margin-bottom: 8px;">📊 기본 시나리오</h4>
                 <p>${scenarios.base_case?.description || 'N/A'}</p>
                 <p style="margin-top: 8px;"><strong>예상 수익률:</strong> ${scenarios.base_case?.expected_return_range || 'N/A'}</p>
             </div>
-            <div class="summary-box" style="background: #fef2f2; border-left: 4px solid #ef4444; margin-bottom: 15px;">
+            <div class="summary-box" style="background: #fef2f2; margin-bottom: 15px;">
                 <h4 style="color: #991b1b; margin-bottom: 8px;">⚠️ 약세 시나리오</h4>
                 <p>${scenarios.bear_case?.description || 'N/A'}</p>
                 <p style="margin-top: 8px;"><strong>예상 수익률:</strong> ${scenarios.bear_case?.expected_return_range || 'N/A'}</p>
@@ -463,7 +505,7 @@ function renderResults(data) {
             }[risk.severity] || '#9ca3af';
             
             html += `
-                <div class="summary-box" style="background: ${severityColor}; border-left: 4px solid ${borderColor}; margin-bottom: 10px;">
+                <div class="summary-box" style="background: ${severityColor}; margin-bottom: 10px;">
                     <h4 style="margin-bottom: 8px;">${risk.title} <span style="font-size: 0.8em; color: #666;">[${getSeverityText(risk.severity)}]</span></h4>
                     <p>${risk.description}</p>
                 </div>
@@ -503,6 +545,13 @@ function renderResults(data) {
             <p style="margin-top: 10px;">본 분석은 AI 기반 데이터 분석 시스템에 의해 생성된 참고 자료입니다. 투자 결정에 따른 책임은 투자자 본인에게 있으며, 반드시 추가적인 리서치를 수행하시기 바랍니다.</p>
         </div>
         
+        <!-- PDF 다운로드 버튼 (하단) -->
+        <div style="margin-top: 20px;">
+            <button id="downloadPdfBtn" class="btn-primary">
+                PDF 다운로드
+            </button>
+        </div>
+        
         <!-- 디버그 정보 (개발용) -->
         <details style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
             <summary style="cursor: pointer; font-weight: 600; color: #667eea;">🔍 상세 데이터 확인 (클릭)</summary>
@@ -511,6 +560,78 @@ function renderResults(data) {
     `;
     
     document.getElementById('resultContent').innerHTML = html;
+    document.getElementById('resultContent').classList.add('active');
+    
+    // PDF 다운로드 이벤트 (중복 방지)
+    const downloadBtn = document.getElementById('downloadPdfBtn');
+    const newBtn = downloadBtn.cloneNode(true);
+    downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+    
+    newBtn.addEventListener('click', async () => {
+        newBtn.disabled = true;
+        newBtn.textContent = 'PDF 생성 중...';
+        
+        try {
+            // 1. 기존 CSS 파일 로드
+            const cssResponse = await fetch('/static/stock_analysis.css');
+            const cssContent = await cssResponse.text();
+            
+            // 2. 결과 HTML 가져오기
+            const resultHtml = document.getElementById('resultContent').innerHTML;
+            
+            // 3. 화면과 동일한 HTML 구조 + CSS 포함
+            const fullHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        /* 화면과 동일한 CSS */
+                        ${cssContent}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div style="text-align: center; margin-bottom: 30px; padding-top: 20px;">
+                            <h1 style="color: #667eea; font-size: 2em; margin-bottom: 10px;">AI 단일 종목 분석 보고서</h1>
+                            <p style="color: #666; font-size: 1em;">
+                                생성일시: ${new Date().toLocaleString('ko-KR')}
+                            </p>
+                        </div>
+                        <div class="panel result-panel">
+                            ${resultHtml}
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            const response = await fetch('/api/stock/download-pdf', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ html: fullHtml })
+            });
+            
+            if (!response.ok) throw new Error('PDF 생성 실패');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `stock_analysis_${basic.ticker}_${new Date().getTime()}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            newBtn.textContent = 'PDF 다운로드';
+            newBtn.disabled = false;
+        } catch (error) {
+            alert('PDF 다운로드 실패: ' + error.message);
+            newBtn.textContent = 'PDF 다운로드';
+            newBtn.disabled = false;
+        }
+    });
 }
 
 // 유틸리티 함수들

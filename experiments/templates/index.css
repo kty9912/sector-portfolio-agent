@@ -264,7 +264,6 @@ body {
 
 .summary-box {
     background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-    border-left: 4px solid #667eea;
     padding: 20px;
     border-radius: 10px;
     font-size: 1.05em;
@@ -434,7 +433,6 @@ body {
     border-radius: 8px;
     padding: 20px;
     margin-top: 40px;
-    border-left: 4px solid #ffc107;
 }
 
 .disclaimer p {

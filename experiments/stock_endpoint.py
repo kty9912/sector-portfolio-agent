@@ -6,13 +6,15 @@ experiments/stock_endpoint.py
 """
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 import json
 import os
 from pathlib import Path
+from datetime import datetime
+from playwright.sync_api import sync_playwright
 
 from agent_test.stock_agent_anthropic import run_stock_analysis_agent
 from core.llm_clients import AVAILABLE_MODELS
@@ -169,6 +171,159 @@ async def get_quick_info(ticker: str):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =====================================================
+# PDF 다운로드 엔드포인트
+# =====================================================
+
+@app.post("/api/stock/download-pdf")
+async def download_pdf(request: dict):
+    """Playwright를 사용한 PDF 다운로드"""
+    try:
+        html_content = request.get("html")
+        if not html_content:
+            raise HTTPException(status_code=400, detail="HTML 데이터가 없습니다")
+        
+        # 한글 폰트 및 PDF용 CSS 추가
+        font_css = """
+        <style>
+            @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+            * {
+                font-family: 'Malgun Gothic', '맑은 고딕', Pretendard, sans-serif !important;
+            }
+            /* PDF용 폰트 크기 최적화 - 디자인은 유지 */
+            @media print {
+                /* 배경 제거 */
+                body {
+                    background: white !important;
+                    padding: 20px !important;
+                }
+                .container {
+                    background: white !important;
+                    box-shadow: none !important;
+                }
+                .panel {
+                    box-shadow: none !important;
+                }
+                
+                /* 버튼 숨김 */
+                .btn-primary { display: none !important; }
+                #downloadPdfBtn { display: none !important; }
+                details { display: none !important; }
+                
+                /* 섹션 - 페이지 분할 방지 */
+                .section {
+                    page-break-inside: avoid;
+                }
+                
+                /* 그림자 제거 */
+                .metric-card {
+                    box-shadow: none !important;
+                }
+                .summary-box {
+                    box-shadow: none !important;
+                }
+                .disclaimer {
+                    box-shadow: none !important;
+                }
+                
+                /* 헤더 섹션 폰트 크기 조정 */
+                .stock-header > div:first-child {
+                    font-size: 1.5em !important;
+                }
+                .stock-header > div:nth-child(2) {
+                    font-size: 0.9em !important;
+                }
+                .stock-header > div:nth-child(3) {
+                    font-size: 0.85em !important;
+                }
+                
+                /* 폰트 크기만 줄임 (디자인은 유지) */
+                .section-title {
+                    font-size: 1.3em !important;
+                }
+                .metric-label {
+                    font-size: 0.75em !important;
+                }
+                .metric-value {
+                    font-size: 1.2em !important;
+                }
+                .metric-unit {
+                    font-size: 0.85em !important;
+                }
+                .summary-box {
+                    font-size: 0.85em !important;
+                    line-height: 1.5 !important;
+                }
+                .summary-box h3, .summary-box h4 {
+                    font-size: 1.1em !important;
+                }
+                .summary-box p {
+                    font-size: 0.85em !important;
+                }
+                
+                /* 면책 조항 */
+                .disclaimer {
+                    page-break-inside: avoid !important;
+                }
+                .disclaimer p {
+                    font-size: 0.75em !important;
+                    line-height: 1.5 !important;
+                }
+                .disclaimer strong {
+                    font-size: 0.85em !important;
+                }
+            }
+        </style>
+        """
+        
+        html_with_font = html_content.replace('<head>', '<head>' + font_css)
+        
+        # Playwright로 PDF 생성
+        def generate_pdf():
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.set_content(html_with_font)
+                page.wait_for_load_state('networkidle')
+                page.wait_for_timeout(2000)
+                
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    landscape=False,
+                    margin={
+                        'top': '15mm',
+                        'right': '15mm',
+                        'bottom': '15mm',
+                        'left': '15mm'
+                    },
+                    print_background=True,
+                    prefer_css_page_size=True
+                )
+                
+                browser.close()
+                return pdf_bytes
+        
+        # 동기 함수를 별도 스레드에서 실행
+        import asyncio
+        import concurrent.futures
+        
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            pdf_bytes = await asyncio.get_event_loop().run_in_executor(executor, generate_pdf)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"stock_analysis_{timestamp}.pdf"
+        
+        return StreamingResponse(
+            iter([pdf_bytes]),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        print(f"❌ PDF 생성 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"PDF 생성 실패: {str(e)}")
 
 
 # =====================================================
