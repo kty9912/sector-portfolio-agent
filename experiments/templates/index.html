@@ -26,14 +26,14 @@
                         <label>AI 분석 엔진</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                             <div class="ai-engine-option">
-                                <input type="radio" id="anthropic" name="aiEngine" value="anthropic" checked>
+                                <input type="radio" id="anthropic" name="aiEngine" value="anthropic">
                                 <label for="anthropic" class="engine-label">
                                     <div class="engine-title">Anthropic</div>
                                     <div class="engine-desc">빠르고 안정적인 분석</div>
                                 </label>
                             </div>
                             <div class="ai-engine-option">
-                                <input type="radio" id="langgraph" name="aiEngine" value="langgraph">
+                                <input type="radio" id="langgraph" name="aiEngine" value="langgraph" checked>
                                 <label for="langgraph" class="engine-label">
                                     <div class="engine-title">LangGraph</div>
                                     <div class="engine-desc">고급 그래프 기반 분석</div>
@@ -52,11 +52,11 @@
                     <div class="form-group">
                         <label>총 투자 예산 (원)</label>
                         <div style="display: flex; gap: 10px; align-items: center;">
-                            <input type="number" id="budgetInput" name="budget" value="5000000" 
+                            <input type="number" id="budgetInput" name="budget" value="50000000" 
                                    min="1000000" step="10000" required
                                    style="flex: 1; font-size: 1.05em; text-align: right;">
                             <span id="budgetDisplay" style="min-width: 140px; font-weight: 600; color: #667eea; text-align: right; padding: 12px 15px; background: #f8f9fa; border-radius: 8px; border: 2px solid #e9ecef; font-size: 1.1em; white-space: nowrap;">
-                                5백만원
+                                <!-- JavaScript로 업데이트됨 -->
                             </span>
                         </div>
                     </div>
@@ -126,11 +126,39 @@
                 </div>
                 
                 <div id="loadingState" class="loading" style="display: none;">
-                    <div class="spinner"></div>
-                    <h3>AI가 포트폴리오를 분석하고 있습니다...</h3>
-                    <p style="margin-top: 10px; color: #666;">
-                        데이터 수집 → 점수 계산 → 최적화 → 보고서 생성
-                    </p>
+                    <!-- 메인 로딩 애니메이션 -->
+                    <div class="loading-animation">
+                        <div class="brain-icon">
+                            <svg viewBox="0 0 100 100" width="80" height="80">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#667eea" stroke-width="3" opacity="0.2"/>
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#667eea" stroke-width="3" stroke-linecap="round" class="loading-circle"/>
+                                <text x="50" y="58" text-anchor="middle" fill="#667eea" font-size="24" font-weight="bold">AI</text>
+                            </svg>
+                        </div>
+                        <div class="pulse-rings">
+                            <div class="pulse-ring ring-1"></div>
+                            <div class="pulse-ring ring-2"></div>
+                            <div class="pulse-ring ring-3"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 로딩 텍스트 -->
+                    <div class="loading-text">
+                        <!-- 단계 메시지 -->
+                        <div class="loading-steps">
+                            <div class="step-message" id="stepMessage">데이터를 수집하고 있습니다</div>
+                        </div>
+                        
+                        <!-- 진행률 바 -->
+                        <div class="progress-section">
+                            <div class="progress-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                                <div class="progress-text" id="progressText">0%</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div id="resultContent" class="result-content"></div>

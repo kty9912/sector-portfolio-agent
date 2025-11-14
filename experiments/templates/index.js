@@ -149,6 +149,339 @@ function updateCount(type) {
     document.getElementById(`${type}Count`).textContent = `선택: ${count}개`;
 }
 
+// 로딩 애니메이션 제어 객체
+const LoadingController = {
+    steps: ['step1', 'step2', 'step3', 'step4', 'step5', 'step6', 'step7', 'step8', 'step9', 'step10', 'step11', 'step12'],
+    stepMessages: [
+        '데이터를 수집하고 있습니다',
+        '주가를 분석하고 있습니다',
+        '재무제표를 분석하고 있습니다',
+        '관련 뉴스를 찾아보고 있습니다',
+        '뉴스를 분석하고 있습니다',
+        '점수를 산출하고 있습니다',
+        '포트폴리오 구성을 분석하고 있습니다',
+        '투자 전략을 최적화하고 있습니다',
+        '전략 내용을 검수하고 있습니다',
+        '포트폴리오 비율 차트를 그리고 있습니다',
+        '수익률 그래프를 그리고 있습니다',
+        '보고서를 작성하고 있습니다'
+    ],
+    currentStep: 0,
+    progress: 0,
+    startTime: null,
+    stepInterval: null,
+    progressInterval: null,
+    timeInterval: null,
+    estimatedDuration: 15000, // 기본 예상 시간 15초
+    
+    start: function(engine, model, requestData = null) {
+        this.startTime = Date.now();
+        this.currentStep = 0;
+        this.progress = 0;
+        
+        // 스마트 예상 시간 계산
+        if (requestData) {
+            const complexity = this.calculateComplexity(requestData);
+            this.estimatedDuration = this.getEstimatedTime(complexity);
+        } else {
+            // 기본 예상 시간
+            this.estimatedDuration = 20000
+        }
+        
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        
+        // 초기화
+        const stepMessageEl = document.getElementById('stepMessage');
+        if (stepMessageEl) {
+            const initialTime = Math.ceil(this.estimatedDuration / 1000);
+            const initialMessage = `${this.stepMessages[0]} (${initialTime}초 남음)`;
+            console.log(`🚀 초기 메시지 설정: ${this.stepMessages[0]} (${initialTime}초)`);
+            stepMessageEl.textContent = initialMessage;
+        }
+        
+        if (progressFill) progressFill.style.width = '0%';
+        if (progressText) progressText.textContent = '0%';
+        
+        // 첫 번째 단계 설정
+        this.currentStep = 0;
+        
+        // 동적 진행률 업데이트 시작
+        this.startProgressAnimation();
+        
+        // 시간 표시 시작
+        this.startTimeEstimation();
+    },
+    
+    activateStep: function(stepIndex) {
+        if (stepIndex >= 0 && stepIndex < this.steps.length && stepIndex !== this.currentStep) {
+            const stepMessageEl = document.getElementById('stepMessage');
+            
+            if (stepMessageEl) {
+                const message = this.stepMessages[stepIndex];
+                const remainingTime = this.getRemainingTime();
+                
+                console.log(`🔄 단계 변경: ${stepIndex + 1}단계 - ${message}, 남은 시간: ${remainingTime}초`);
+                
+                if (remainingTime > 0 && this.progress < 95) {
+                    stepMessageEl.textContent = `${message} (${remainingTime}초 남음)`;
+                } else {
+                    stepMessageEl.textContent = message;
+                }
+            }
+            
+            this.currentStep = stepIndex;
+        }
+    },
+    
+    updateProgress: function(percent) {
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        
+        console.log(`📊 진행률 업데이트: ${percent}%`);
+        
+        if (progressFill) {
+            progressFill.style.width = `${percent}%`;
+            console.log(`✅ 프로그레스 바 너비 설정: ${percent}%`);
+        } else {
+            console.error('❌ progressFill 요소를 찾을 수 없음');
+        }
+        
+        if (progressText) {
+            progressText.textContent = `${Math.round(percent)}%`;
+        } else {
+            console.error('❌ progressText 요소를 찾을 수 없음');
+        }
+        
+        // 진행률에 따라 단계 활성화 (12단계)
+        const stepIndex = Math.min(Math.floor(percent / 8.33), 11); // 100/12 = 8.33
+        if (stepIndex !== this.currentStep) {
+            this.activateStep(stepIndex);
+        }
+        
+        this.progress = percent;
+    },
+    
+    startProgressAnimation: function() {
+        // 기본적인 진행률 애니메이션 (실제 API 응답이 없을 때의 fallback)
+        this.progressInterval = setInterval(() => {
+            const elapsed = Date.now() - this.startTime;
+            
+            // 처음 10초는 빠르게, 그 후는 천천히
+            let targetProgress;
+            if (elapsed < 10000) {
+                targetProgress = (elapsed / 10000) * 60; // 10초에 60%까지
+            } else {
+                targetProgress = 60 + ((elapsed - 10000) / 20000) * 35; // 추가 20초에 35%
+            }
+            
+            targetProgress = Math.min(targetProgress, 95); // 95%까지만
+            
+            if (this.progress < targetProgress) {
+                this.updateProgress(Math.min(this.progress + 1, targetProgress));
+            }
+        }, 100);
+    },
+    
+    complete: function() {
+        // 로딩 완료
+        this.updateProgress(100);
+        
+        // 마지막 단계 활성화
+        this.activateStep(11);
+        
+        // 완료 메시지 표시
+        setTimeout(() => {
+            const stepMessageEl = document.getElementById('stepMessage');
+            if (stepMessageEl) {
+                stepMessageEl.textContent = '분석이 완료되었습니다!';
+            }
+        }, 500);
+        
+        // 타이머 정리
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = null;
+        }
+        
+        if (this.timeInterval) {
+            clearInterval(this.timeInterval);
+            this.timeInterval = null;
+        }
+        
+        setTimeout(() => {
+            this.reset();
+        }, 1500);
+    },
+    
+    reset: function() {
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = null;
+        }
+        
+        if (this.timeInterval) {
+            clearInterval(this.timeInterval);
+            this.timeInterval = null;
+        }
+        
+        this.currentStep = 0;
+        this.progress = 0;
+        this.startTime = null;
+    },
+    
+    // 외부에서 특정 단계로 점프할 수 있는 메서드
+    jumpToStep: function(stepIndex, progress = null) {
+        this.activateStep(stepIndex);
+        if (progress !== null) {
+            this.updateProgress(progress);
+        }
+    },
+    
+    // 수동으로 진행률 증가
+    incrementProgress: function(amount = 5) {
+        const newProgress = Math.min(this.progress + amount, 95);
+        this.updateProgress(newProgress);
+    },
+    
+    // 예상 시간 표시 기능 (stepMessage를 사용하므로 간소화)
+    startTimeEstimation: function() {
+        // 1초마다 시간 업데이트
+        this.timeInterval = setInterval(() => {
+            this.updateTimeDisplay();
+        }, 1000);
+    },
+    
+    getRemainingTime: function() {
+        if (!this.startTime) return 0;
+        const elapsed = Date.now() - this.startTime;
+        const remaining = Math.max(0, this.estimatedDuration - elapsed);
+        return Math.ceil(remaining / 1000);
+    },
+    
+    updateTimeDisplay: function() {
+        const stepMessageEl = document.getElementById('stepMessage');
+        if (stepMessageEl && this.progress < 95) {
+            const message = this.stepMessages[this.currentStep];
+            const remainingTime = this.getRemainingTime();
+            
+            console.log(`⏱️ 시간 업데이트: ${message}, 남은 시간: ${remainingTime}초`);
+            
+            if (remainingTime > 0) {
+                stepMessageEl.textContent = `${message} (${remainingTime}초 남음)`;
+            } else {
+                stepMessageEl.textContent = message;
+            }
+        }
+    },
+    
+    getStatusMessage: function(stepIndex) {
+        return this.stepMessages[stepIndex] || 'AI가 포트폴리오를 분석하고 있습니다...';
+    },
+    
+    // 요청 복잡도 계산
+    calculateComplexity: function(requestData) {
+        let complexity = 1;
+        
+        // 선택된 섹터/주식 수에 따른 복잡도
+        const sectors = requestData.investment_targets?.sectors || [];
+        const stocks = requestData.investment_targets?.tickers || [];
+        const totalItems = sectors.length + stocks.length;
+        complexity += totalItems * 0.2;
+        
+        // 예산 크기에 따른 복잡도
+        if (requestData.budget) {
+            const amount = requestData.budget;
+            if (amount > 100000000) complexity += 0.5; // 1억 이상
+            if (amount > 500000000) complexity += 0.3; // 5억 이상
+        }
+        
+        // 투자 기간에 따른 복잡도
+        if (requestData.investment_period === 'long') {
+            complexity += 0.2; // 장기투자는 더 복잡한 분석 필요
+        }
+        
+        // 리스크 프로필에 따른 복잡도
+        if (requestData.risk_profile === 'conservative') {
+            complexity += 0.3; // 보수적 투자는 더 신중한 분석 필요
+        }
+        
+        console.log(`💡 복잡도 계산: 기본(1) + 항목수(${totalItems}*0.1) + 예산보너스 + 기타 = ${complexity.toFixed(2)}`);
+        
+        return Math.min(complexity, 3); // 최대 3배
+    },
+    
+    // 예상 시간 계산
+    getEstimatedTime: function(complexity) {
+        const estimatedTime = 18000 * complexity;
+        
+        console.log(`⏱️ 예상 시간 계산: 기본시간(18초) × 복잡도(${complexity.toFixed(2)}) = ${(estimatedTime/1000).toFixed(1)}초`);
+        
+        return estimatedTime;
+    }
+};
+
+// 기존 함수는 호환성을 위해 유지 (requestData 추가)
+function startLoadingAnimation(engine, model, requestData = null) {
+    LoadingController.start(engine, model, requestData);
+}
+
+// 스마트 추정 기반 요청 처리
+async function handleRegularRequest(apiEndpoint, requestData, selectedEngine) {
+    const startTime = Date.now();
+    
+    // LoadingController에서 이미 복잡도 분석과 예상 시간이 설정되어 있음
+    const estimatedTime = LoadingController.estimatedDuration;
+    
+    // 동적 진행률 시작
+    const progressUpdater = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const estimatedProgress = Math.min((elapsed / estimatedTime) * 90, 90);
+        
+        // 단계별 진행률 매핑 (12단계)
+        const stepIndex = Math.floor(estimatedProgress / 8.33); // 100/12 = 8.33
+        if (LoadingController.currentStep !== stepIndex && estimatedProgress > LoadingController.progress) {
+            LoadingController.activateStep(stepIndex);
+        }
+    }, 500);
+    
+    try {
+        // 1-3단계: 요청 전송 및 데이터 수집
+        LoadingController.jumpToStep(0, 8);   // 데이터 수집
+        
+        const response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(requestData)
+        });
+        
+        // 4-6단계: 분석 시작
+        LoadingController.jumpToStep(3, 33);  // 뉴스 검색
+        
+        const result = await response.json();
+        
+        // 7-9단계: 전략 최적화
+        LoadingController.jumpToStep(6, 58);  // 포트폴리오 구성 분석
+        
+        if (result.success) {
+            // 10-11단계: 차트 생성
+            LoadingController.jumpToStep(9, 83); // 차트 생성
+            renderResults(result.report, result.iterations);
+            
+            // 12단계: 보고서 작성 완료
+            LoadingController.jumpToStep(11, 95);
+            
+            setTimeout(() => {
+                LoadingController.complete();
+            }, 500);
+        } else {
+            throw new Error(result.detail || '분석 실패');
+        }
+    } finally {
+        clearInterval(progressUpdater);
+    }
+}
+
 // ⭐ DOM이 완전히 로드된 후 초기 함수 실행
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[OK] DOM 로드 완료 - 초기 함수 실행');
@@ -172,36 +505,29 @@ document.addEventListener('DOMContentLoaded', function() {
 // ⭐ 예산 포맷팅 함수
 function formatBudget(num) {
     num = parseInt(num) || 0;
-    
-    if (num >= 100000000) {
-        const eok = Math.floor(num / 100000000);
-        const remainder = num % 100000000;
-        const cheonman = Math.floor(remainder / 10000000);
-        
-        if (cheonman > 0) {
-            return `${eok}억 ${cheonman}천만원`;
+    if (num <= 0) return '0원';
+
+    const numKor = {'0': '', '1': '일', '2': '이', '3': '삼', '4': '사', '5': '오', '6': '육', '7': '칠', '8': '팔', '9': '구'};
+    const sUnitKor = ['', '십', '백', '천'];
+    const lUnitKor = ['', '만', '억', '조', '경'];
+
+    let numStrList = num.toString().split('').reverse();
+
+    let result = '';
+    for(let i = 0; i < numStrList.length / 4; i++) {
+        const char = numStrList.slice(i * 4, (i + 1) * 4).join('')
+        if(char === '0000') continue;
+
+        let part = '';
+        for(let j = 0; j < char.length; j++) {
+            const n = char.charAt(j);
+            if(n === '0') continue;
+            part = numKor[n] + sUnitKor[j] + part;
         }
-        return `${eok}억원`;
-    } 
-    else if (num >= 10000000) {
-        const cheonman = Math.floor(num / 10000000);
-        const baekman = Math.floor((num % 10000000) / 1000000);
-        
-        if (baekman > 0) {
-            return `${cheonman}천 ${baekman}백만원`;
-        }
-        return `${cheonman}천만원`;
-    } 
-    else if (num >= 1000000) {
-        const baekman = Math.floor(num / 1000000);
-        return `${baekman}백만원`;
+        result = part + lUnitKor[i] + result;
     }
-    else if (num >= 10000) {
-        const man = Math.floor(num / 10000);
-        return `${man}만원`;
-    }
-    
-    return num.toLocaleString() + '원';
+
+    return result + '원';
 }
 
 // 폼 제출
@@ -242,30 +568,22 @@ document.getElementById('portfolioForm').addEventListener('submit', async (e) =>
     document.getElementById('resultContent').classList.remove('active');
     document.getElementById('analyzeBtn').disabled = true;
     
+    // 로딩 애니메이션 시작 (requestData 전달로 스마트 추정)
+    startLoadingAnimation(selectedEngine, selectedModel, requestData);
+    
     // 선택된 엔진 표시
     const engineDisplay = selectedEngine === 'langgraph' ? 'LangGraph' : 'Anthropic';
-    const loadingText = document.querySelector('#loadingState p');
-    if (loadingText) {
-        loadingText.innerHTML = `${engineDisplay} 엔진으로 포트폴리오를 분석하고 있습니다...<br><small>선택된 모델: ${selectedModel}</small>`;
-    }
 
     try {
         console.log(`🚀 ${engineDisplay} 엔진으로 요청 전송:`, apiEndpoint);
-        const response = await fetch(apiEndpoint, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(requestData)
-        });
         
-        const result = await response.json();
-        
-        if (result.success) {
-            renderResults(result.report, result.iterations);
-        } else {
-            throw new Error(result.detail || '분석 실패');
-        }
+        // 스마트 추정 방식으로 요청 처리
+        await handleRegularRequest(apiEndpoint, requestData, selectedEngine);
         
     } catch (error) {
+        // 에러 발생 시 로딩 완료 처리
+        LoadingController.complete();
+        
         document.getElementById('resultContent').innerHTML = `
             <div style="background: #fee; border: 2px solid #fcc; border-radius: 12px; padding: 30px; color: #c33;">
                 <h3>❌ 오류 발생</h3>
@@ -274,8 +592,11 @@ document.getElementById('portfolioForm').addEventListener('submit', async (e) =>
         `;
         document.getElementById('resultContent').classList.add('active');
     } finally {
-        document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('analyzeBtn').disabled = false;
+        // 로딩 상태 숨기기
+        setTimeout(() => {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('analyzeBtn').disabled = false;
+        }, 1000); // 로딩 완료 애니메이션을 볼 수 있도록 잠시 대기
     }
 });
 
