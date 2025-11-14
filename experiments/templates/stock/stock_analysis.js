@@ -165,11 +165,26 @@ document.getElementById('analysisForm').addEventListener('submit', async (e) => 
         // 로딩 중지
         LoadingController.stop();
         
+        // 차트 데이터 로드
+        let chartData = null;
+        try {
+            console.log('📊 차트 데이터 요청 중...');
+            const chartDataResponse = await fetch(`/api/chart-data/${ticker}`);
+            if (chartDataResponse.ok) {
+                chartData = await chartDataResponse.json();
+                console.log('✅ 차트 데이터 로드 성공:', chartData);
+            } else {
+                console.warn('⚠️ 차트 데이터 로드 실패:', chartDataResponse.status);
+            }
+        } catch (error) {
+            console.error('❌ 차트 데이터 로드 오류:', error);
+        }
+        
         // 결과 렌더링
         setTimeout(() => {
             document.getElementById('loadingState').style.display = 'none';
             document.getElementById('resultContent').classList.add('active');
-            renderResults(result);
+            renderResults(result, chartData);
         }, 500);
         
     } catch (error) {
@@ -185,9 +200,14 @@ document.getElementById('analysisForm').addEventListener('submit', async (e) => 
 });
 
 // 결과 렌더링
-function renderResults(data) {
+function renderResults(data, chartData) {
     // 콘솔에 전체 데이터 출력 (디버깅용)
     console.log('📊 분석 결과 데이터:', data);
+    console.log('📈 차트 데이터:', chartData);
+    console.log('🎯 투자 추천 전체:', data.recommendation);
+    console.log('🎯 목표가 범위:', data.recommendation?.target_price_range);
+    console.log('💰 시장 현황:', data.market_snapshot);
+    console.log('🎯 시나리오:', data.scenarios_1y);
     console.log('💰 현재가:', data.market_snapshot?.current_price);
     console.log('🎯 목표가:', data.recommendation?.target_price_range);
     console.log('📈 재무 데이터:', {
@@ -271,7 +291,7 @@ function renderResults(data) {
         <!-- 투자 추천 -->
         <div class="section">
             <div class="section-title">🎯 투자 추천</div>
-            <div class="summary-box" style="background: #ffffff; padding: 30px;">
+            <div class="summary-box" style="background: #ffffff; padding: 25px; margin-top: 15px;">
                 <div class="metrics-grid">
                     <div class="metric-card">
                         <div class="metric-label">목표주가</div>
@@ -326,6 +346,54 @@ function renderResults(data) {
             </div>
             <div class="summary-box" style="margin-top: 20px;">
                 <p>${market.relative_to_market || '시장 대비 수익률 정보 없음'}</p>
+            </div>
+        </div>
+        
+        <!-- 주가 차트 -->
+        <div class="section">
+            <div class="section-title">📈 주가 추이 (6개월)</div>
+            <div id="priceChart" style="height: 400px; width: 100%;"></div>
+        </div>
+        
+        <!-- 재무 성과 차트 -->
+        <div class="section">
+            <div class="section-title">📊 재무 성과 추이 (4분기)</div>
+            <div id="financialChart" style="height: 400px; width: 100%;"></div>
+        </div>
+        
+        <!-- 시나리오 비교 표 -->
+        <div class="section">
+            <div class="section-title">🎯 시나리오 비교</div>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">시나리오</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">예상 수익률</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">설명</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 12px;"><strong style="color: #059669;">🚀 강세</strong></td>
+                            <td style="padding: 12px; color: #059669; font-weight: 600;">${scenarios.bull_case?.expected_return_range || 'N/A'}</td>
+                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.bull_case?.description || '-'}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 12px;"><strong style="color: #f59e0b;">📊 기본</strong></td>
+                            <td style="padding: 12px; color: #f59e0b; font-weight: 600;">${scenarios.base_case?.expected_return_range || 'N/A'}</td>
+                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.base_case?.description || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px;"><strong style="color: #ef4444;">⚠️ 약세</strong></td>
+                            <td style="padding: 12px; color: #ef4444; font-weight: 600;">${scenarios.bear_case?.expected_return_range || 'N/A'}</td>
+                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.bear_case?.description || '-'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="summary-box" style="margin-top: 15px;">
+                <p>${scenarios.scenario_comment || '시나리오 분석 정보 없음'}</p>
             </div>
         </div>
         
@@ -462,29 +530,6 @@ function renderResults(data) {
             </div>
         </div>
         
-        <!-- 투자 시나리오 -->
-        <div class="section">
-            <div class="section-title">🎯 향후 12개월 시나리오</div>
-            <div class="summary-box" style="background: #f0fdf4; margin-bottom: 15px;">
-                <h4 style="color: #166534; margin-bottom: 8px;">🚀 강세 시나리오</h4>
-                <p>${scenarios.bull_case?.description || 'N/A'}</p>
-                <p style="margin-top: 8px;"><strong>예상 수익률:</strong> ${scenarios.bull_case?.expected_return_range || 'N/A'}</p>
-            </div>
-            <div class="summary-box" style="background: #fffbeb; margin-bottom: 15px;">
-                <h4 style="color: #92400e; margin-bottom: 8px;">📊 기본 시나리오</h4>
-                <p>${scenarios.base_case?.description || 'N/A'}</p>
-                <p style="margin-top: 8px;"><strong>예상 수익률:</strong> ${scenarios.base_case?.expected_return_range || 'N/A'}</p>
-            </div>
-            <div class="summary-box" style="background: #fef2f2; margin-bottom: 15px;">
-                <h4 style="color: #991b1b; margin-bottom: 8px;">⚠️ 약세 시나리오</h4>
-                <p>${scenarios.bear_case?.description || 'N/A'}</p>
-                <p style="margin-top: 8px;"><strong>예상 수익률:</strong> ${scenarios.bear_case?.expected_return_range || 'N/A'}</p>
-            </div>
-            <div class="summary-box">
-                <p>${scenarios.scenario_comment || '시나리오 분석 정보 없음'}</p>
-            </div>
-        </div>
-        
         <!-- 리스크 -->
         <div class="section">
             <div class="section-title">⚠️ 주요 리스크</div>
@@ -562,6 +607,21 @@ function renderResults(data) {
     document.getElementById('resultContent').innerHTML = html;
     document.getElementById('resultContent').classList.add('active');
     
+    // 차트 렌더링 (디버깅 로그 추가)
+    console.log('🎨 차트 렌더링 시작');
+    console.log('📊 차트 데이터:', chartData);
+    console.log('🎯 목표가:', recommendation.target_price_range);
+    console.log('💰 현재가:', market.current_price);
+    
+    setTimeout(() => {
+        try {
+            renderCharts(chartData, recommendation.target_price_range, market.current_price);
+            console.log('✅ 차트 렌더링 완료');
+        } catch (error) {
+            console.error('❌ 차트 렌더링 오류:', error);
+        }
+    }, 100);
+    
     // PDF 다운로드 이벤트 (중복 방지)
     const downloadBtn = document.getElementById('downloadPdfBtn');
     const newBtn = downloadBtn.cloneNode(true);
@@ -572,14 +632,69 @@ function renderResults(data) {
         newBtn.textContent = 'PDF 생성 중...';
         
         try {
-            // 1. 기존 CSS 파일 로드
+            // 1. 결과 HTML을 복사본으로 만들기
+            const resultContentClone = document.getElementById('resultContent').cloneNode(true);
+            
+            // 2. 차트를 이미지로 변환
+            const priceChartDiv = document.getElementById('priceChart');
+            const financialChartDiv = document.getElementById('financialChart');
+            
+            // 복사본에서 차트 div 찾기
+            const clonedPriceChart = resultContentClone.querySelector('#priceChart');
+            const clonedFinancialChart = resultContentClone.querySelector('#financialChart');
+            
+            // 주가 차트 이미지로 교체
+            if (priceChartDiv && priceChartDiv.querySelector('.plotly') && clonedPriceChart) {
+                try {
+                    const imgData = await Plotly.toImage(priceChartDiv, {
+                        format: 'png',
+                        width: 800,
+                        height: 400
+                    });
+                    const img = document.createElement('img');
+                    img.src = imgData;
+                    img.style.cssText = 'width: 100%; max-width: 800px; height: auto; display: block; margin: 20px auto;';
+                    clonedPriceChart.parentNode.replaceChild(img, clonedPriceChart);
+                    console.log('✅ 주가 차트 이미지 변환 완료');
+                } catch (e) {
+                    console.warn('⚠️ 주가 차트 변환 실패:', e);
+                    // 실패 시 차트 div 제거
+                    if (clonedPriceChart.parentNode) {
+                        clonedPriceChart.parentNode.removeChild(clonedPriceChart);
+                    }
+                }
+            }
+            
+            // 재무 차트 이미지로 교체
+            if (financialChartDiv && financialChartDiv.querySelector('.plotly') && clonedFinancialChart) {
+                try {
+                    const imgData = await Plotly.toImage(financialChartDiv, {
+                        format: 'png',
+                        width: 800,
+                        height: 400
+                    });
+                    const img = document.createElement('img');
+                    img.src = imgData;
+                    img.style.cssText = 'width: 100%; max-width: 800px; height: auto; display: block; margin: 20px auto;';
+                    clonedFinancialChart.parentNode.replaceChild(img, clonedFinancialChart);
+                    console.log('✅ 재무 차트 이미지 변환 완료');
+                } catch (e) {
+                    console.warn('⚠️ 재무 차트 변환 실패:', e);
+                    // 실패 시 차트 div 제거
+                    if (clonedFinancialChart.parentNode) {
+                        clonedFinancialChart.parentNode.removeChild(clonedFinancialChart);
+                    }
+                }
+            }
+            
+            // 3. 기존 CSS 파일 로드
             const cssResponse = await fetch('/static/stock_analysis.css');
             const cssContent = await cssResponse.text();
             
-            // 2. 결과 HTML 가져오기
-            const resultHtml = document.getElementById('resultContent').innerHTML;
+            // 4. 변환된 HTML 가져오기
+            const resultHtml = resultContentClone.innerHTML;
             
-            // 3. 화면과 동일한 HTML 구조 + CSS 포함
+            // 5. 화면과 동일한 HTML 구조 + CSS 포함
             const fullHtml = `
                 <!DOCTYPE html>
                 <html>
@@ -726,6 +841,151 @@ function getRecommendationColor(rating) {
         'SELL': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
     };
     return colors[rating] || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+}
+
+// 차트 렌더링 함수
+function renderCharts(chartData, targetPrice, currentPrice) {
+    console.log('🎨 renderCharts 호출됨');
+    console.log('  chartData:', chartData);
+    console.log('  targetPrice:', targetPrice);
+    console.log('  currentPrice:', currentPrice);
+    
+    // 1. 주가 차트
+    if (chartData && chartData.prices && chartData.prices.length > 0) {
+        console.log('📈 주가 차트 데이터 있음:', chartData.prices.length, '개');
+        
+        const dates = chartData.prices.map(p => p.date);
+        const prices = chartData.prices.map(p => p.close);
+        
+        // 20일 이동평균
+        const ma20 = [];
+        for (let i = 0; i < prices.length; i++) {
+            if (i < 19) {
+                ma20.push(null);
+            } else {
+                const sum = prices.slice(i - 19, i + 1).reduce((a, b) => a + b, 0);
+                ma20.push(sum / 20);
+            }
+        }
+        
+        // 60일 이동평균
+        const ma60 = [];
+        for (let i = 0; i < prices.length; i++) {
+            if (i < 59) {
+                ma60.push(null);
+            } else {
+                const sum = prices.slice(i - 59, i + 1).reduce((a, b) => a + b, 0);
+                ma60.push(sum / 60);
+            }
+        }
+        
+        const priceTrace = {
+            x: dates,
+            y: prices,
+            type: 'scatter',
+            mode: 'lines',
+            name: '종가',
+            line: { color: '#6366F1', width: 2.5 }
+        };
+        
+        const ma20Trace = {
+            x: dates,
+            y: ma20,
+            type: 'scatter',
+            mode: 'lines',
+            name: '20일 이평선',
+            line: { color: '#818CF8', width: 1.5, dash: 'dash' }
+        };
+        
+        const ma60Trace = {
+            x: dates,
+            y: ma60,
+            type: 'scatter',
+            mode: 'lines',
+            name: '60일 이평선',
+            line: { color: '#C7D2FE', width: 1.5, dash: 'dash' }
+        };
+        
+        const traces = [priceTrace, ma20Trace, ma60Trace];
+        
+        // 목표가 범위 표시 (있는 경우)
+        if (targetPrice && typeof targetPrice === 'string') {
+            const match = targetPrice.match(/(\d{1,3}(,\d{3})*(\.\d+)?)/g);
+            if (match && match.length >= 1) {
+                const targetValue = parseFloat(match[0].replace(/,/g, ''));
+                traces.push({
+                    x: dates,
+                    y: Array(dates.length).fill(targetValue),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: '목표가',
+                    line: { color: '#F59E0B', width: 2.5, dash: 'dot' }
+                });
+            }
+        }
+        
+        const priceLayout = {
+            title: '',
+            xaxis: { title: '날짜' },
+            yaxis: { title: '가격 (원)' },
+            showlegend: true,
+            legend: { x: 0, y: 1 },
+            margin: { l: 50, r: 30, t: 30, b: 50 }
+        };
+        
+        Plotly.newPlot('priceChart', traces, priceLayout, { responsive: true });
+        console.log('✅ 주가 차트 렌더링 완료');
+    } else {
+        console.warn('⚠️ 주가 차트 데이터 없음');
+    }
+    
+    // 2. 재무 차트
+    if (chartData && chartData.financials && chartData.financials.length > 0) {
+        console.log('📊 재무 차트 데이터 있음:', chartData.financials.length, '개');
+        const periods = chartData.financials.map(f => f.period);
+        const revenues = chartData.financials.map(f => f.revenue ? f.revenue / 1e8 : 0);
+        const opIncomes = chartData.financials.map(f => f.operating_income ? f.operating_income / 1e8 : 0);
+        const netIncomes = chartData.financials.map(f => f.net_income ? f.net_income / 1e8 : 0);
+        
+        const revenueTrace = {
+            x: periods,
+            y: revenues,
+            type: 'bar',
+            name: '매출액',
+            marker: { color: '#A5B4FC' }
+        };
+        
+        const opIncomeTrace = {
+            x: periods,
+            y: opIncomes,
+            type: 'bar',
+            name: '영업이익',
+            marker: { color: '#6366F1' }
+        };
+        
+        const netIncomeTrace = {
+            x: periods,
+            y: netIncomes,
+            type: 'bar',
+            name: '순이익',
+            marker: { color: '#CBD5E1' }
+        };
+        
+        const financialLayout = {
+            title: '',
+            xaxis: { title: '분기' },
+            yaxis: { title: '금액 (억원)' },
+            barmode: 'group',
+            showlegend: true,
+            legend: { x: 0, y: 1 },
+            margin: { l: 50, r: 30, t: 30, b: 50 }
+        };
+        
+        Plotly.newPlot('financialChart', [revenueTrace, opIncomeTrace, netIncomeTrace], financialLayout, { responsive: true });
+        console.log('✅ 재무 차트 렌더링 완료');
+    } else {
+        console.warn('⚠️ 재무 차트 데이터 없음');
+    }
 }
 
 // 초기화

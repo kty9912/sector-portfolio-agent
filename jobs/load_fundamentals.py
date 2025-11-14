@@ -118,7 +118,9 @@ def _extract_blocks(tkr: yf.Ticker, quarterly=False):
     bs  = bs.transpose()
     cf  = cf.transpose() if cf is not None else pd.DataFrame()
 
-    for idx in list(fin.index)[-4:]:  # 최근 4기간만
+    # 연간: 최근 4년, 분기: 최근 16분기
+    period_count = 16 if quarterly else 4
+    for idx in list(fin.index)[-period_count:]:
         def get(df, key):
             try: return df.loc[idx, key]
             except Exception: return None

@@ -173,6 +173,92 @@ async def get_quick_info(ticker: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/chart-data/{ticker}")
+async def get_chart_data(ticker: str):
+    """차트용 데이터 조회 (주가 6개월 + 재무 4분기)"""
+    try:
+        print(f"\n{'='*60}")
+        print(f"📊 차트 데이터 조회 요청: {ticker}")
+        print(f"{'='*60}\n")
+        
+        from core.db import fetch_all
+        from datetime import datetime, timedelta
+        
+        # 1. 주가 데이터 (6개월)
+        six_months_ago = (datetime.now() - timedelta(days=180)).date()
+        print(f"📅 조회 시작일: {six_months_ago}")
+        
+        price_sql = """
+            SELECT date, close, volume
+            FROM prices_daily
+            WHERE ticker = %s AND date >= %s
+            ORDER BY date
+        """
+        
+        print(f"🔍 주가 데이터 조회 중...")
+        price_rows = fetch_all(price_sql, (ticker, six_months_ago))
+        print(f"✅ 주가 데이터 {len(price_rows)}개 조회됨")
+        
+        prices = []
+        for row in price_rows:
+            prices.append({
+                "date": row[0].isoformat(),
+                "close": float(row[1]) if row[1] else None,
+                "volume": int(row[2]) if row[2] else None
+            })
+        
+        # 2. 재무 데이터 (최근 4분기)
+        financial_sql = """
+            SELECT fiscal_date, revenue, op_income, net_income
+            FROM fundamentals
+            WHERE ticker = %s AND freq = 'Q'
+            ORDER BY fiscal_date DESC
+            LIMIT 4
+        """
+        
+        print(f"🔍 재무 데이터 조회 중...")
+        financial_rows = fetch_all(financial_sql, (ticker,))
+        print(f"✅ 재무 데이터 {len(financial_rows)}개 조회됨")
+        
+        financials = []
+        for row in financial_rows:
+            # fiscal_date로부터 연도와 분기 추출 (예: 2024-03-31 -> 2024Q1)
+            fiscal_date = row[0]
+            if fiscal_date:
+                year = fiscal_date.year
+                month = fiscal_date.month
+                quarter = (month - 1) // 3 + 1
+                period = f"{year}Q{quarter}"
+            else:
+                period = "N/A"
+            
+            financials.append({
+                "period": period,
+                "revenue": float(row[1]) if row[1] else None,
+                "operating_income": float(row[2]) if row[2] else None,
+                "net_income": float(row[3]) if row[3] else None
+            })
+        
+        # 최신순으로 정렬되어 있으므로 역순으로 변경 (시간순)
+        financials.reverse()
+        
+        result = {
+            "ticker": ticker,
+            "prices": prices,
+            "financials": financials
+        }
+        
+        print(f"📦 반환 데이터: prices={len(prices)}개, financials={len(financials)}개\n")
+        
+        return result
+    
+    except Exception as e:
+        print(f"❌ 차트 데이터 조회 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =====================================================
 # PDF 다운로드 엔드포인트
 # =====================================================
@@ -212,6 +298,13 @@ async def download_pdf(request: dict):
                 #downloadPdfBtn { display: none !important; }
                 details { display: none !important; }
                 
+                /* 이미지로 변환된 차트는 그대로 표시 */
+                img {
+                    page-break-inside: avoid;
+                    max-width: 100% !important;
+                    height: auto !important;
+                }
+                
                 /* 섹션 - 페이지 분할 방지 */
                 .section {
                     page-break-inside: avoid;
@@ -230,18 +323,18 @@ async def download_pdf(request: dict):
                 
                 /* 헤더 섹션 폰트 크기 조정 */
                 .stock-header > div:first-child {
-                    font-size: 1.5em !important;
+                    font-size: 1.2em !important;  /* 제목 크기 축소 */
                 }
                 .stock-header > div:nth-child(2) {
-                    font-size: 0.9em !important;
+                    font-size: 0.85em !important;
                 }
                 .stock-header > div:nth-child(3) {
-                    font-size: 0.85em !important;
+                    font-size: 0.8em !important;
                 }
                 
                 /* 폰트 크기만 줄임 (디자인은 유지) */
                 .section-title {
-                    font-size: 1.3em !important;
+                    font-size: 1.1em !important;  /* 섹션 제목 축소 */
                 }
                 .metric-label {
                     font-size: 0.75em !important;
@@ -261,6 +354,17 @@ async def download_pdf(request: dict):
                 }
                 .summary-box p {
                     font-size: 0.85em !important;
+                }
+                
+                /* 시나리오 비교 테이블 */
+                table {
+                    font-size: 0.8em !important;
+                }
+                table th {
+                    font-size: 0.85em !important;
+                }
+                table td {
+                    font-size: 0.8em !important;
                 }
                 
                 /* 면책 조항 */
