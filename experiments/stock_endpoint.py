@@ -209,10 +209,13 @@ async def get_chart_data(ticker: str):
         
         # 2. 재무 데이터 (최근 4분기)
         financial_sql = """
-            SELECT fiscal_date, revenue, op_income, net_income
-            FROM fundamentals
-            WHERE ticker = %s AND freq = 'Q'
-            ORDER BY fiscal_date DESC
+            SELECT f.fiscal_date, f.revenue, f.op_income, f.net_income, 
+                   f.total_liab, f.equity,
+                   m.roe, m.debt_ratio
+            FROM fundamentals f
+            LEFT JOIN fin_metrics m ON f.ticker = m.ticker AND f.fiscal_date = m.fiscal_date AND f.freq = m.freq
+            WHERE f.ticker = %s AND f.freq = 'Q'
+            ORDER BY f.fiscal_date DESC
             LIMIT 4
         """
         
@@ -236,7 +239,11 @@ async def get_chart_data(ticker: str):
                 "period": period,
                 "revenue": float(row[1]) if row[1] else None,
                 "operating_income": float(row[2]) if row[2] else None,
-                "net_income": float(row[3]) if row[3] else None
+                "net_income": float(row[3]) if row[3] else None,
+                "total_liab": float(row[4]) if row[4] else None,
+                "equity": float(row[5]) if row[5] else None,
+                "roe": float(row[6]) if row[6] else None,
+                "debt_ratio": float(row[7]) if row[7] else None
             })
         
         # 최신순으로 정렬되어 있으므로 역순으로 변경 (시간순)
@@ -254,6 +261,139 @@ async def get_chart_data(ticker: str):
     
     except Exception as e:
         print(f"❌ 차트 데이터 조회 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/sector-comparison/{ticker}")
+async def get_sector_comparison(ticker: str):
+    """섹터 내 밸류에이션 비교 데이터 조회"""
+    try:
+        print(f"\n{'='*60}")
+        print(f"🔍 섹터 비교 데이터 조회: {ticker}")
+        print(f"{'='*60}\n")
+        
+        from core.db import fetch_all, fetch_one
+        
+        # 1. 해당 종목의 섹터 확인
+        sector_sql = """
+            SELECT industry
+            FROM companies
+            WHERE ticker = %s
+        """
+        sector_row = fetch_one(sector_sql, (ticker,))
+        
+        if not sector_row:
+            return {"error": "종목을 찾을 수 없습니다"}
+        
+        sector = sector_row[0]
+        print(f"📊 섹터: {sector}")
+        
+        # 2. 같은 섹터의 다른 종목들 조회 (최대 5개)
+        comparison_sql = """
+            SELECT 
+                c.ticker,
+                c.name_kr,
+                p.close as current_price,
+                f.revenue,
+                f.net_income,
+                f.equity,
+                f.ebitda,
+                f.total_assets,
+                m.roe
+            FROM companies c
+            LEFT JOIN (
+                SELECT ticker, close
+                FROM prices_daily
+                WHERE (ticker, date) IN (
+                    SELECT ticker, MAX(date)
+                    FROM prices_daily
+                    GROUP BY ticker
+                )
+            ) p ON c.ticker = p.ticker
+            LEFT JOIN (
+                SELECT ticker, revenue, net_income, equity, ebitda, total_assets
+                FROM fundamentals
+                WHERE (ticker, fiscal_date) IN (
+                    SELECT ticker, MAX(fiscal_date)
+                    FROM fundamentals
+                    WHERE freq = 'Q'
+                    GROUP BY ticker
+                )
+            ) f ON c.ticker = f.ticker
+            LEFT JOIN (
+                SELECT ticker, roe
+                FROM fin_metrics
+                WHERE (ticker, fiscal_date) IN (
+                    SELECT ticker, MAX(fiscal_date)
+                    FROM fin_metrics
+                    WHERE freq = 'Q'
+                    GROUP BY ticker
+                )
+            ) m ON c.ticker = m.ticker
+            WHERE c.industry = %s
+            ORDER BY f.revenue DESC NULLS LAST
+            LIMIT 5
+        """
+        
+        rows = fetch_all(comparison_sql, (sector,))
+        print(f"✅ {len(rows)}개 종목 조회됨")
+        
+        comparisons = []
+        for row in rows:
+            # PER 계산: 주가 / EPS, EPS = net_income / shares (간단 추정)
+            per = None
+            pbr = None
+            market_cap = None
+            ev_ebitda = None
+            
+            current_price = float(row[2]) if row[2] else None
+            revenue = float(row[3]) if row[3] else None
+            net_income = float(row[4]) if row[4] else None
+            equity = float(row[5]) if row[5] else None
+            ebitda = float(row[6]) if row[6] else None
+            total_assets = float(row[7]) if row[7] else None
+            
+            # 시가총액 추정 (equity * 2 정도로 간단 추정)
+            if equity and equity > 0:
+                market_cap = equity * 2.5
+            
+            # PBR 계산: 시가총액 / 자기자본
+            if market_cap and equity and equity > 0:
+                pbr = market_cap / equity
+            
+            # PER 계산: 시가총액 / 순이익
+            if market_cap and net_income and net_income > 0:
+                per = market_cap / net_income
+            
+            # EV/EBITDA 계산: 시가총액 / EBITDA (부채 고려 안함)
+            if market_cap and ebitda and ebitda > 0:
+                ev_ebitda = market_cap / ebitda
+            
+            comparisons.append({
+                "ticker": row[0],
+                "name": row[1],
+                "current_price": current_price,
+                "per": per,
+                "pbr": pbr,
+                "ev_ebitda": ev_ebitda,
+                "market_cap": market_cap,
+                "is_target": row[0] == ticker
+            })
+        
+        result = {
+            "ticker": ticker,
+            "sector": sector,
+            "comparisons": comparisons
+        }
+        
+        print(f"📦 섹터 비교 데이터 반환: {len(comparisons)}개 종목\n")
+        
+        return result
+    
+    except Exception as e:
+        print(f"❌ 섹터 비교 데이터 조회 실패: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

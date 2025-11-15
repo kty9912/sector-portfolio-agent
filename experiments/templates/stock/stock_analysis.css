@@ -757,3 +757,12 @@ body {
         font-size: 1.5em;
     }
 }
+
+/* PDF 출력 전용 스타일 */
+@media print {
+    /* 목표주가 글자 크기 조정 */
+    .target-price-value {
+        font-size: 0.7em !important;
+        line-height: 1.2 !important;
+    }
+}

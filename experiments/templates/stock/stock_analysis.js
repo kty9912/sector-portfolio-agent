@@ -11,8 +11,11 @@ async function loadAvailableStocks() {
         if (data.stocks && data.stocks.length > 0) {
             let html = '<option value="">종목을 선택하세요</option>';
             
+            // 가나다순 정렬
+            const sortedStocks = data.stocks.sort((a, b) => a.name.localeCompare(b.name, 'ko-KR'));
+            
             // 단순 목록으로 표시 (시장 구분 없이)
-            data.stocks.forEach(stock => {
+            sortedStocks.forEach(stock => {
                 html += `<option value="${stock.ticker}">${stock.name} (${stock.ticker})</option>`;
             });
             
@@ -176,15 +179,24 @@ document.getElementById('analysisForm').addEventListener('submit', async (e) => 
             } else {
                 console.warn('⚠️ 차트 데이터 로드 실패:', chartDataResponse.status);
             }
+            
+            console.log('🔍 섹터 비교 데이터 요청 중...');
+            const sectorResponse = await fetch(`/api/sector-comparison/${ticker}`);
+            if (sectorResponse.ok) {
+                sectorComparison = await sectorResponse.json();
+                console.log('✅ 섹터 비교 데이터 로드 성공:', sectorComparison);
+            } else {
+                console.warn('⚠️ 섹터 비교 데이터 로드 실패:', sectorResponse.status);
+            }
         } catch (error) {
-            console.error('❌ 차트 데이터 로드 오류:', error);
+            console.error('❌ 데이터 로드 오류:', error);
         }
         
         // 결과 렌더링
         setTimeout(() => {
             document.getElementById('loadingState').style.display = 'none';
             document.getElementById('resultContent').classList.add('active');
-            renderResults(result, chartData);
+            renderResults(result, chartData, sectorComparison);
         }, 500);
         
     } catch (error) {
@@ -200,10 +212,11 @@ document.getElementById('analysisForm').addEventListener('submit', async (e) => 
 });
 
 // 결과 렌더링
-function renderResults(data, chartData) {
+function renderResults(data, chartData, sectorComparison) {
     // 콘솔에 전체 데이터 출력 (디버깅용)
     console.log('📊 분석 결과 데이터:', data);
     console.log('📈 차트 데이터:', chartData);
+    console.log('🔍 섹터 비교:', sectorComparison);
     console.log('🎯 투자 추천 전체:', data.recommendation);
     console.log('🎯 목표가 범위:', data.recommendation?.target_price_range);
     console.log('💰 시장 현황:', data.market_snapshot);
@@ -291,114 +304,28 @@ function renderResults(data, chartData) {
         <!-- 투자 추천 -->
         <div class="section">
             <div class="section-title">🎯 투자 추천</div>
-            <div class="summary-box" style="background: #ffffff; padding: 25px; margin-top: 15px;">
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-label">목표주가</div>
-                        <div class="metric-value" style="font-size: 1.5em;">${recommendation.target_price_range || 'N/A'}</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">투자 기간</div>
-                        <div class="metric-value" style="font-size: 1.5em;">${recommendation.time_horizon_months || 12}개월</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">신뢰도</div>
-                        <div class="metric-value" style="font-size: 1.5em;">${getConfidenceText(recommendation.confidence_level) || 'N/A'}</div>
-                    </div>
-                </div>
-                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                    <p><strong>손절 힌트:</strong> ${recommendation.stop_loss_hint || 'N/A'}</p>
-                    <p style="margin-top: 10px;">${recommendation.recommendation_comment || '추천 코멘트 없음'}</p>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 시장 현황 -->
-        <div class="section">
-            <div class="section-title">💰 시장 현황</div>
             <div class="metrics-grid">
                 <div class="metric-card">
-                    <div class="metric-label">현재가</div>
-                    <div class="metric-value">₩${formatNumber(market.current_price || 0)}</div>
+                    <div class="metric-label">목표주가</div>
+                    <div class="metric-value target-price-value" style="font-size: 1.5em;">${recommendation.target_price_range || 'N/A'}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">1일 변동</div>
-                    <div class="metric-value" style="color: ${(market.price_change_1d || 0) >= 0 ? '#10b981' : '#ef4444'}">
-                        ${formatPercent(market.price_change_1d || 0)}
-                    </div>
+                    <div class="metric-label">투자 기간</div>
+                    <div class="metric-value" style="font-size: 1.5em;">${recommendation.time_horizon_months || 12}개월</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">1개월 수익률</div>
-                    <div class="metric-value">${formatPercent(market.return_1m || 0)}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">3개월 수익률</div>
-                    <div class="metric-value">${formatPercent(market.return_3m || 0)}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">6개월 수익률</div>
-                    <div class="metric-value">${formatPercent(market.return_6m || 0)}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">변동성 (20일)</div>
-                    <div class="metric-value">${formatPercent(market.volatility_20d || 0)}</div>
+                    <div class="metric-label">신뢰도</div>
+                    <div class="metric-value" style="font-size: 1.5em;">${getConfidenceText(recommendation.confidence_level) || 'N/A'}</div>
                 </div>
             </div>
             <div class="summary-box" style="margin-top: 20px;">
-                <p>${market.relative_to_market || '시장 대비 수익률 정보 없음'}</p>
-            </div>
-        </div>
-        
-        <!-- 주가 차트 -->
-        <div class="section">
-            <div class="section-title">📈 주가 추이 (6개월)</div>
-            <div id="priceChart" style="height: 400px; width: 100%;"></div>
-        </div>
-        
-        <!-- 재무 성과 차트 -->
-        <div class="section">
-            <div class="section-title">📊 재무 성과 추이 (4분기)</div>
-            <div id="financialChart" style="height: 400px; width: 100%;"></div>
-        </div>
-        
-        <!-- 시나리오 비교 표 -->
-        <div class="section">
-            <div class="section-title">🎯 시나리오 비교</div>
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; background: white;">
-                    <thead>
-                        <tr style="background: #f8f9fa;">
-                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">시나리오</th>
-                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">예상 수익률</th>
-                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">설명</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="border-bottom: 1px solid #dee2e6;">
-                            <td style="padding: 12px;"><strong style="color: #059669;">🚀 강세</strong></td>
-                            <td style="padding: 12px; color: #059669; font-weight: 600;">${scenarios.bull_case?.expected_return_range || 'N/A'}</td>
-                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.bull_case?.description || '-'}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #dee2e6;">
-                            <td style="padding: 12px;"><strong style="color: #f59e0b;">📊 기본</strong></td>
-                            <td style="padding: 12px; color: #f59e0b; font-weight: 600;">${scenarios.base_case?.expected_return_range || 'N/A'}</td>
-                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.base_case?.description || '-'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 12px;"><strong style="color: #ef4444;">⚠️ 약세</strong></td>
-                            <td style="padding: 12px; color: #ef4444; font-weight: 600;">${scenarios.bear_case?.expected_return_range || 'N/A'}</td>
-                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.bear_case?.description || '-'}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="summary-box" style="margin-top: 15px;">
-                <p>${scenarios.scenario_comment || '시나리오 분석 정보 없음'}</p>
+                <p><strong>손절 힌트:</strong> ${recommendation.stop_loss_hint || 'N/A'}</p>
+                <p style="margin-top: 10px;">${recommendation.recommendation_comment || '추천 코멘트 없음'}</p>
             </div>
         </div>
         
         <!-- 종합 점수 -->
-        <div class="section">
+        <div class="section" style="margin-top: 80px;">
             <div class="section-title">⭐ 종합 평가 점수</div>
             <div class="metrics-grid four-columns">
                 <div class="metric-card">
@@ -435,9 +362,102 @@ function renderResults(data, chartData) {
             </div>
         </div>
         
+        <!-- 시장 현황 -->
+        <div class="section">
+            <div class="section-title">� 시장 현황</div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">현재가</div>
+                    <div class="metric-value">₩${formatNumber(market.current_price || 0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">1일 변동</div>
+                    <div class="metric-value" style="color: ${(market.price_change_1d || 0) >= 0 ? '#10b981' : '#ef4444'}">
+                        ${formatPercent(market.price_change_1d || 0)}
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">1개월 수익률</div>
+                    <div class="metric-value">${formatPercent(market.return_1m || 0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">3개월 수익률</div>
+                    <div class="metric-value">${formatPercent(market.return_3m || 0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">6개월 수익률</div>
+                    <div class="metric-value">${formatPercent(market.return_6m || 0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">변동성 (20일)</div>
+                    <div class="metric-value">${formatPercent(market.volatility_20d || 0)}</div>
+                </div>
+            </div>
+            <div class="summary-box" style="margin-top: 20px;">
+                <p>${market.relative_to_market || '시장 대비 수익률 정보 없음'}</p>
+            </div>
+        </div>
+        
+        <!-- 주가 차트 -->
+        <div class="section">
+            <div class="section-title">� 주가 추이 (6개월)</div>
+            <div id="priceChart" style="height: 400px; width: 100%;"></div>
+        </div>
+        
+        <!-- 기술적 지표 상태 테이블 -->
+        <div class="section">
+            <div class="section-title">📊 기술적 지표 상태</div>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white; font-size: 0.9em;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">지표</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">값</th>
+                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">신호</th>
+                        </tr>
+                    </thead>
+                    <tbody id="technicalIndicatorsTableBody">
+                        <!-- JavaScript로 동적 생성 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 기술적 분석 -->
+        <div class="section">
+            <div class="section-title">� 기술적 분석</div>
+            <div class="metrics-grid four-columns">
+                <div class="metric-card">
+                    <div class="metric-label">추세</div>
+                    <div class="metric-value" style="font-size: 0.95em;">
+                        ${getTrendText(technical.trend)}
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">RSI (14일)</div>
+                    <div class="metric-value" style="font-size: 0.95em;">${(technical.rsi14 || 50).toFixed(1)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">모멘텀 (20일)</div>
+                    <div class="metric-value" style="font-size: 0.95em;">${formatPercent(technical.momentum_20d || 0)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">변동성</div>
+                    <div class="metric-value" style="font-size: 0.95em;">${getVolatilityText(technical.volatility_20d_level)}</div>
+                </div>
+            </div>
+            <div class="summary-box" style="margin-top: 20px;">
+                <p><strong>지지 구간:</strong> ${technical.support_resistance?.support_zone || 'N/A'}</p>
+                <p><strong>저항 구간:</strong> ${technical.support_resistance?.resistance_zone || 'N/A'}</p>
+                <p style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
+                    ${technical.technical_comment || '기술적 분석 정보 없음'}
+                </p>
+            </div>
+        </div>
+        
         <!-- 재무 실적 -->
         <div class="section">
-            <div class="section-title">💼 재무 실적 (${financial.latest_period || 'N/A'})</div>
+            <div class="section-title">�💼 재무 실적 (${financial.latest_period || 'N/A'})</div>
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-label">매출액</div>
@@ -469,35 +489,87 @@ function renderResults(data, chartData) {
             </div>
         </div>
         
-        <!-- 기술적 분석 -->
+        <!-- 재무 성과 차트 -->
         <div class="section">
-            <div class="section-title">📈 기술적 분석</div>
-            <div class="metrics-grid four-columns">
-                <div class="metric-card">
-                    <div class="metric-label">추세</div>
-                    <div class="metric-value" style="font-size: 1.2em;">
-                        ${getTrendEmoji(technical.trend)} ${getTrendText(technical.trend)}
-                    </div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">RSI (14일)</div>
-                    <div class="metric-value">${(technical.rsi14 || 50).toFixed(1)}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">모멘텀 (20일)</div>
-                    <div class="metric-value">${formatPercent(technical.momentum_20d || 0)}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">변동성</div>
-                    <div class="metric-value" style="font-size: 1.2em;">${getVolatilityText(technical.volatility_20d_level)}</div>
-                </div>
+            <div class="section-title">� 재무 성과 추이 (4분기)</div>
+            <div id="financialChart" style="height: 400px; width: 100%;"></div>
+        </div>
+        
+        <!-- 재무 비율 트렌드 표 -->
+        <div class="section">
+            <div class="section-title">📋 재무 비율 트렌드</div>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white; font-size: 0.9em;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">기간</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">매출</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">영업이익률</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">ROE</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">부채비율</th>
+                        </tr>
+                    </thead>
+                    <tbody id="financialTrendTableBody">
+                        <!-- JavaScript로 동적 생성 -->
+                    </tbody>
+                </table>
             </div>
-            <div class="summary-box" style="margin-top: 20px;">
-                <p><strong>지지 구간:</strong> ${technical.support_resistance?.support_zone || 'N/A'}</p>
-                <p><strong>저항 구간:</strong> ${technical.support_resistance?.resistance_zone || 'N/A'}</p>
-                <p style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
-                    ${technical.technical_comment || '기술적 분석 정보 없음'}
-                </p>
+        </div>
+        
+        <!-- 밸류에이션 멀티플 비교표 -->
+        <div class="section" id="valuationComparisonSection">
+            <div class="section-title">📊 밸류에이션 멀티플 비교 (섹터 내)</div>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white; font-size: 0.9em;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">종목</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">PER</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">PBR</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">EV/EBITDA</th>
+                            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #dee2e6;">비고</th>
+                        </tr>
+                    </thead>
+                    <tbody id="valuationComparisonTableBody">
+                        <!-- JavaScript로 동적 생성 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- 시나리오 비교 표 -->
+        <div class="section">
+            <div class="section-title">🎯 시나리오 비교</div>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">시나리오</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">예상 수익률</th>
+                            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6;">설명</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 12px;"><strong style="color: #059669;">🚀 강세</strong></td>
+                            <td style="padding: 12px; color: #059669; font-weight: 600;">${scenarios.bull_case?.expected_return_range || 'N/A'}</td>
+                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.bull_case?.description || '-'}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 12px;"><strong style="color: #f59e0b;">📊 기본</strong></td>
+                            <td style="padding: 12px; color: #f59e0b; font-weight: 600;">${scenarios.base_case?.expected_return_range || 'N/A'}</td>
+                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.base_case?.description || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px;"><strong style="color: #ef4444;">⚠️ 약세</strong></td>
+                            <td style="padding: 12px; color: #ef4444; font-weight: 600;">${scenarios.bear_case?.expected_return_range || 'N/A'}</td>
+                            <td style="padding: 12px; font-size: 0.9em;">${scenarios.bear_case?.description || '-'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="summary-box" style="margin-top: 15px;">
+                <p>${scenarios.scenario_comment || '시나리오 분석 정보 없음'}</p>
             </div>
         </div>
         
@@ -616,6 +688,9 @@ function renderResults(data, chartData) {
     setTimeout(() => {
         try {
             renderCharts(chartData, recommendation.target_price_range, market.current_price);
+            fillFinancialTrendTable(chartData);
+            fillValuationComparisonTable(sectorComparison);
+            fillTechnicalIndicatorTable(chartData, technical);
             console.log('✅ 차트 렌더링 완료');
         } catch (error) {
             console.error('❌ 차트 렌더링 오류:', error);
@@ -691,10 +766,16 @@ function renderResults(data, chartData) {
             const cssResponse = await fetch('/static/stock_analysis.css');
             const cssContent = await cssResponse.text();
             
-            // 4. 변환된 HTML 가져오기
+            // 4. PDF 전용 스타일 조정
+            const targetPriceElements = resultContentClone.querySelectorAll('.target-price-value');
+            targetPriceElements.forEach(el => {
+                el.style.setProperty('font-size', '0.8em', 'important');
+            });
+            
+            // 5. 변환된 HTML 가져오기
             const resultHtml = resultContentClone.innerHTML;
             
-            // 5. 화면과 동일한 HTML 구조 + CSS 포함
+            // 6. 화면과 동일한 HTML 구조 + CSS 포함
             const fullHtml = `
                 <!DOCTYPE html>
                 <html>
@@ -841,6 +922,245 @@ function getRecommendationColor(rating) {
         'SELL': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
     };
     return colors[rating] || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+}
+
+// 기술적 지표 헬퍼 함수들
+function getRsiSignal(rsi) {
+    if (!rsi) return '중립';
+    if (rsi > 70) return '과매수';
+    if (rsi < 30) return '과매도';
+    if (rsi >= 50) return '중립~강세';
+    return '중립~약세';
+}
+
+function getRsiSignalColor(rsi) {
+    if (!rsi) return '#666';
+    if (rsi > 70) return '#ef4444';
+    if (rsi < 30) return '#10b981';
+    if (rsi >= 50) return '#059669';
+    return '#f59e0b';
+}
+
+function getRsiSignal(rsi) {
+    if (!rsi) return '데이터 없음';
+    if (rsi > 70) return '과매수 (매도 고려)';
+    if (rsi < 30) return '과매도 (매수 고려)';
+    if (rsi >= 50) return '강세';
+    return '약세';
+}
+
+function getMaSignal(ma20, ma60, currentPrice) {
+    if (!ma20 || !ma60 || !currentPrice) return '데이터 없음';
+    if (ma20 > ma60) return '골든크로스 (상향)';
+    if (ma20 < ma60) return '데드크로스 (하향)';
+    return '중립';
+}
+
+function getMaSignalColor(ma20, ma60, currentPrice) {
+    if (!ma20 || !ma60) return '#666';
+    if (ma20 > ma60) return '#10b981';
+    if (ma20 < ma60) return '#ef4444';
+    return '#666';
+}
+
+function getMomentumSignal(momentum) {
+    if (!momentum) return '중립';
+    if (momentum > 0.05) return '강한 상승 모멘텀';
+    if (momentum > 0) return '상승 모멘텀';
+    if (momentum > -0.05) return '하락 모멘텀';
+    return '강한 하락 모멘텀';
+}
+
+function getMomentumSignalColor(momentum) {
+    if (!momentum) return '#666';
+    if (momentum > 0.05) return '#10b981';
+    if (momentum > 0) return '#059669';
+    if (momentum > -0.05) return '#f59e0b';
+    return '#ef4444';
+}
+
+function getVolatilitySignalColor(level) {
+    const colors = {
+        'low': '#10b981',
+        'medium': '#f59e0b',
+        'high': '#ef4444'
+    };
+    return colors[level] || '#666';
+}
+
+function getVolatilityText(level) {
+    const texts = {
+        'low': '낮음 (안정)',
+        'medium': '보통',
+        'high': '높음 (주의)'
+    };
+    return texts[level] || '데이터 없음';
+}
+
+// 재무 비율 트렌드 테이블 채우기
+function fillFinancialTrendTable(chartData) {
+    const tbody = document.getElementById('financialTrendTableBody');
+    if (!tbody || !chartData || !chartData.financials || chartData.financials.length === 0) {
+        return;
+    }
+    
+    let html = '';
+    chartData.financials.forEach((item, index) => {
+        const prevItem = index > 0 ? chartData.financials[index - 1] : null;
+        
+        // 영업이익률 계산
+        const opm = item.revenue > 0 ? (item.operating_income / item.revenue * 100) : 0;
+        
+        // ROE와 부채비율 표시
+        const roeText = item.roe ? (item.roe * 100).toFixed(1) + '%' : '-';
+        const debtRatioText = item.debt_ratio ? (item.debt_ratio * 100).toFixed(1) + '%' : '-';
+        
+        html += `
+            <tr style="border-bottom: 1px solid #dee2e6;">
+                <td style="padding: 10px;"><strong>${item.period}</strong></td>
+                <td style="padding: 10px; text-align: right;">${formatKoreanWon(item.revenue || 0)}</td>
+                <td style="padding: 10px; text-align: right;">${opm.toFixed(1)}%</td>
+                <td style="padding: 10px; text-align: right;">${roeText}</td>
+                <td style="padding: 10px; text-align: right;">${debtRatioText}</td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+}
+
+// 기술적 지표 테이블 채우기 (차트 데이터로부터 직접 계산)
+function fillTechnicalIndicatorTable(chartData, technical) {
+    const tbody = document.getElementById('technicalIndicatorsTableBody');
+    if (!tbody) {
+        console.error('technicalIndicatorsTableBody element not found');
+        return;
+    }
+
+    if (!chartData || !chartData.prices || chartData.prices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">데이터 없음</td></tr>';
+        return;
+    }
+
+    const prices = chartData.prices;
+    const currentPrice = prices[prices.length - 1].close;
+    
+    // MA20, MA60 계산
+    let ma20 = null, ma60 = null;
+    if (prices.length >= 20) {
+        const sum20 = prices.slice(-20).reduce((acc, p) => acc + p.close, 0);
+        ma20 = sum20 / 20;
+    }
+    if (prices.length >= 60) {
+        const sum60 = prices.slice(-60).reduce((acc, p) => acc + p.close, 0);
+        ma60 = sum60 / 60;
+    }
+
+    // 모멘텀 계산 (20일 변화율)
+    let momentum20 = null;
+    if (prices.length >= 21) {
+        const price20DaysAgo = prices[prices.length - 21].close;
+        momentum20 = (currentPrice - price20DaysAgo) / price20DaysAgo;
+    }
+
+    // 변동성 계산 (20일 표준편차)
+    let volatility20 = null;
+    if (prices.length >= 20) {
+        const last20Prices = prices.slice(-20).map(p => p.close);
+        const mean = last20Prices.reduce((a, b) => a + b, 0) / 20;
+        const variance = last20Prices.reduce((acc, p) => acc + Math.pow(p - mean, 2), 0) / 20;
+        volatility20 = Math.sqrt(variance) / mean;
+    }
+
+    // RSI는 backend에서 가져온 값 사용
+    const rsi = technical && technical.rsi14 ? technical.rsi14 : null;
+
+    // 테이블 행 생성
+    let rows = '';
+
+    // RSI
+    rows += `
+        <tr style="border-bottom: 1px solid #dee2e6;">
+            <td style="padding: 10px;"><strong>RSI(14)</strong></td>
+            <td style="padding: 10px; text-align: right;">${rsi !== null ? rsi.toFixed(1) : 'N/A'}</td>
+            <td style="padding: 10px; ${getRsiSignalColor(rsi) ? 'color: ' + getRsiSignalColor(rsi) + ';' : ''}">${getRsiSignal(rsi)}</td>
+        </tr>
+    `;
+
+    // 이동평균
+    rows += `
+        <tr style="border-bottom: 1px solid #dee2e6;">
+            <td style="padding: 10px;"><strong>이동평균</strong></td>
+            <td style="padding: 10px; text-align: right;">
+                MA20: ${ma20 !== null ? formatNumber(ma20) : 'N/A'}<br>
+                MA60: ${ma60 !== null ? formatNumber(ma60) : 'N/A'}
+            </td>
+            <td style="padding: 10px; ${getMaSignalColor(ma20, ma60, currentPrice) ? 'color: ' + getMaSignalColor(ma20, ma60, currentPrice) + ';' : ''}">${getMaSignal(ma20, ma60, currentPrice)}</td>
+        </tr>
+    `;
+
+    // 모멘텀
+    rows += `
+        <tr style="border-bottom: 1px solid #dee2e6;">
+            <td style="padding: 10px;"><strong>모멘텀(20일)</strong></td>
+            <td style="padding: 10px; text-align: right;">${momentum20 !== null ? formatPercent(momentum20) : 'N/A'}</td>
+            <td style="padding: 10px; ${getMomentumSignalColor(momentum20) ? 'color: ' + getMomentumSignalColor(momentum20) + ';' : ''}">${getMomentumSignal(momentum20)}</td>
+        </tr>
+    `;
+
+    // 변동성
+    const volatilityLevel = getVolatilityLevel(volatility20);
+    rows += `
+        <tr>
+            <td style="padding: 10px;"><strong>변동성(20일)</strong></td>
+            <td style="padding: 10px; text-align: right;">${volatility20 !== null ? formatPercent(volatility20) : 'N/A'}</td>
+            <td style="padding: 10px; ${getVolatilitySignalColor(volatilityLevel) ? 'color: ' + getVolatilitySignalColor(volatilityLevel) + ';' : ''}">${getVolatilityText(volatilityLevel)}</td>
+        </tr>
+    `;
+
+    tbody.innerHTML = rows;
+}
+
+// 변동성 레벨 계산
+function getVolatilityLevel(volatility) {
+    if (volatility === null) return null;
+    if (volatility < 0.02) return 'low';
+    if (volatility < 0.04) return 'medium';
+    return 'high';
+}
+
+// 밸류에이션 비교 테이블 채우기
+function fillValuationComparisonTable(sectorComparison) {
+    const section = document.getElementById('valuationComparisonSection');
+    const tbody = document.getElementById('valuationComparisonTableBody');
+    
+    if (!tbody) return;
+    
+    if (!sectorComparison || !sectorComparison.comparisons || sectorComparison.comparisons.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+    
+    section.style.display = 'block';
+    
+    let html = '';
+    sectorComparison.comparisons.forEach(comp => {
+        const isTarget = comp.is_target;
+        const rowStyle = isTarget ? 'background: #f0f9ff; font-weight: 600;' : '';
+        const remarkText = isTarget ? '<span style="color: #667eea; font-weight: 600;">분석 대상</span>' : '<span style="color: #666;">경쟁사</span>';
+        
+        html += `
+            <tr style="border-bottom: 1px solid #dee2e6; ${rowStyle}">
+                <td style="padding: 10px;">${comp.name || comp.ticker}</td>
+                <td style="padding: 10px; text-align: right;">${comp.per ? comp.per.toFixed(1) + 'x' : '-'}</td>
+                <td style="padding: 10px; text-align: right;">${comp.pbr ? comp.pbr.toFixed(2) + 'x' : '-'}</td>
+                <td style="padding: 10px; text-align: right;">${comp.ev_ebitda ? comp.ev_ebitda.toFixed(1) + 'x' : '-'}</td>
+                <td style="padding: 10px; text-align: center;">${remarkText}</td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
 }
 
 // 차트 렌더링 함수
