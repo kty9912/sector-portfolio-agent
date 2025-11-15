@@ -300,30 +300,96 @@ def get_technical_signals(ticker: str) -> Dict[str, Any]:
 
 
 def get_news_sentiment(ticker: str, company_name: str) -> Dict[str, Any]:
-    """Qdrant 기반 실제 뉴스 감성 분석"""
+    """뉴스 감성 분석 (더미 데이터)"""
     try:
-        result = search_stock_news.invoke({"ticker": ticker, "company_name": company_name, "limit": 10})
-        news = result.get("news", [])
-        positive = sum(1 for n in news if n.get('sentiment') == 'positive')
-        negative = sum(1 for n in news if n.get('sentiment') == 'negative')
-        news_score = ((positive - negative) / len(news)) * 50 + 50 if news else 50
+        # 더미 뉴스 데이터 생성
+        import random
+        
+        # 업종별 뉴스 템플릿
+        news_templates = {
+            "positive": [
+                f"{company_name}, 신제품 출시로 시장 점유율 확대 전망",
+                f"{company_name}, 분기 실적 서프라이즈... 영업이익 30% 증가",
+                f"{company_name}, 글로벌 시장 진출 본격화... 수출 급증",
+                f"{company_name}, 기술 혁신으로 업계 선두 입지 강화",
+                f"{company_name}, 대규모 투자 유치 성공... 성장 동력 확보"
+            ],
+            "neutral": [
+                f"{company_name}, 정기 주주총회 개최... 배당 정책 논의",
+                f"{company_name}, 신임 CEO 선임... 경영 정상화 기대",
+                f"{company_name}, 업계 동향 주시 중... 전략 재검토",
+                f"{company_name}, 시장 변화에 따른 사업 구조 조정",
+                f"{company_name}, 분기 실적 발표 예정... 시장 관심 집중"
+            ],
+            "negative": [
+                f"{company_name}, 경쟁 심화로 수익성 악화 우려",
+                f"{company_name}, 원자재 가격 상승으로 마진 압박",
+                f"{company_name}, 글로벌 경기 둔화 영향... 실적 하향",
+                f"{company_name}, 규제 강화로 사업 환경 악화",
+                f"{company_name}, 주요 고객사 이탈... 매출 감소 전망"
+            ]
+        }
+        
+        # 랜덤 감성 선택 (가중치: positive 40%, neutral 40%, negative 20%)
+        sentiment_choice = random.choices(
+            ["positive", "neutral", "negative"],
+            weights=[0.4, 0.4, 0.2],
+            k=1
+        )[0]
+        
+        # 뉴스 3-5개 생성
+        num_news = random.randint(3, 5)
+        news_list = []
+        
+        for _ in range(num_news):
+            # 주로 선택된 감성, 가끔 다른 감성
+            current_sentiment = sentiment_choice if random.random() > 0.3 else random.choice(["positive", "neutral", "negative"])
+            title = random.choice(news_templates[current_sentiment])
+            
+            # 감성 점수 (-1.0 ~ 1.0)
+            if current_sentiment == "positive":
+                score = random.uniform(0.3, 0.9)
+            elif current_sentiment == "negative":
+                score = random.uniform(-0.9, -0.3)
+            else:
+                score = random.uniform(-0.2, 0.2)
+            
+            news_list.append({
+                "title": title,
+                "sentiment_score": score,
+                "date": "2025-11-14"
+            })
+        
+        # 평균 감성 점수
+        avg_score = sum(n['sentiment_score'] for n in news_list) / len(news_list)
+        
+        if avg_score > 0.2:
+            sentiment = "positive"
+        elif avg_score < -0.2:
+            sentiment = "negative"
+        else:
+            sentiment = "neutral"
+        
         highlights = [
             {
-                "title": n.get('title', ''),
-                "summary": n.get('text_preview', '')
+                "title": n['title'],
+                "summary": f"{company_name}의 최근 동향에 대한 분석입니다. 시장 전문가들은 {'긍정적인' if n['sentiment_score'] > 0 else '부정적인' if n['sentiment_score'] < 0 else '중립적인'} 의견을 제시하고 있습니다."
             }
-            for n in news[:5]
+            for n in news_list[:3]
         ]
+        
         return {
             "ticker": ticker,
             "company_name": company_name,
-            "news_count": len(news),
-            "sentiment": "positive" if positive > negative else "negative" if negative > positive else "neutral",
-            "news_score": int(news_score),
+            "news_count": len(news_list),
+            "sentiment": sentiment,
+            "avg_sentiment_score": round(avg_score, 3),
+            "articles": news_list,
             "highlights": highlights
         }
     except Exception as e:
         return {"error": str(e)}
+
 
 
 # =====================================================

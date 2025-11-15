@@ -19,7 +19,28 @@
             <div class="panel input-panel">
                 <h2>종목 분석 조건</h2>
                 
-                <form id="analysisForm">
+                <form id="analysisForm">          
+                    <!-- AI 분석 엔진 선택 -->
+                    <div class="form-group">
+                        <label>AI 분석 엔진</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="ai-engine-option">
+                                <input type="radio" id="anthropic" name="aiEngine" value="anthropic">
+                                <label for="anthropic" class="engine-label">
+                                    <div class="engine-title">Anthropic</div>
+                                    <div class="engine-desc">빠르고 안정적인 분석</div>
+                                </label>
+                            </div>
+                            <div class="ai-engine-option">
+                                <input type="radio" id="langgraph" name="aiEngine" value="langgraph" checked>
+                                <label for="langgraph" class="engine-label">
+                                    <div class="engine-title">LangGraph</div>
+                                    <div class="engine-desc">고급 그래프 기반 분석</div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- 1. 종목 선택 -->
                     <div class="form-group">
                         <label>분석 종목</label>
@@ -27,7 +48,7 @@
                             <option value="">종목을 선택하세요</option>
                         </select>
                         <div class="ticker-examples" style="margin-top: 8px;">
-                            <small>💡 등록된 종목 중에서 선택하세요</small>
+                            <small>등록된 종목 중에서 선택하세요</small>
                         </div>
                     </div>
                     

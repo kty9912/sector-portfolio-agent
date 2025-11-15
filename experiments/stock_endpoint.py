@@ -17,6 +17,7 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright
 
 from agent_test.stock_agent_anthropic import run_stock_analysis_agent
+from agent_test.stock_agent_langgraph import run_langgraph_stock_analysis
 from core.llm_clients import AVAILABLE_MODELS
 
 app = FastAPI(title="AI 단일 종목 분석 시스템")
@@ -141,6 +142,35 @@ async def analyze_stock(request: StockAnalysisRequest):
     
     except Exception as e:
         print(f"❌ 에러 발생: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stock/anthropic")
+async def analyze_stock_anthropic(request: StockAnalysisRequest):
+    """Anthropic 기반 종목 분석"""
+    try:
+        result = run_stock_analysis_agent(
+            ticker=request.ticker,
+            profile=request.profile,
+            model_name=request.model_name
+        )
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/stock/langgraph")
+async def analyze_stock_langgraph(request: StockAnalysisRequest):
+    """LangGraph 기반 종목 분석"""
+    try:
+        print('request :', request)
+        result = run_langgraph_stock_analysis(
+            ticker=request.ticker,
+            profile=request.profile,
+            model_name=request.model_name
+        )
+        return JSONResponse(content=result)
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

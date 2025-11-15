@@ -136,6 +136,7 @@ document.getElementById('analysisForm').addEventListener('submit', async (e) => 
     
     const profile = formData.get('profile');
     const model_name = formData.get('model_name');
+    const selectedEngine = formData.get('aiEngine');
     
     // UI 상태 변경
     document.getElementById('emptyState').style.display = 'none';
@@ -143,11 +144,17 @@ document.getElementById('analysisForm').addEventListener('submit', async (e) => 
     document.getElementById('resultContent').classList.remove('active');
     document.getElementById('analyzeBtn').disabled = true;
     
-    // 로딩 시작
+    // 로딩 애니메이션 시작
     LoadingController.start();
-    
+
     try {
-        const response = await fetch('/api/analyze', {
+        let apiEndpoint = '/api/stock/anthropic'; // 기본 엔드포인트
+
+        if (selectedEngine === 'langgraph') {
+            apiEndpoint = '/api/stock/langgraph';
+        }
+
+        const response = await fetch(apiEndpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -214,16 +221,16 @@ document.getElementById('analysisForm').addEventListener('submit', async (e) => 
 // 결과 렌더링
 function renderResults(data, chartData, sectorComparison) {
     // 콘솔에 전체 데이터 출력 (디버깅용)
-    console.log('📊 분석 결과 데이터:', data);
-    console.log('📈 차트 데이터:', chartData);
-    console.log('🔍 섹터 비교:', sectorComparison);
-    console.log('🎯 투자 추천 전체:', data.recommendation);
-    console.log('🎯 목표가 범위:', data.recommendation?.target_price_range);
-    console.log('💰 시장 현황:', data.market_snapshot);
-    console.log('🎯 시나리오:', data.scenarios_1y);
-    console.log('💰 현재가:', data.market_snapshot?.current_price);
-    console.log('🎯 목표가:', data.recommendation?.target_price_range);
-    console.log('📈 재무 데이터:', {
+    console.log('분석 결과 데이터:', data);
+    console.log('차트 데이터:', chartData);
+    console.log('섹터 비교:', sectorComparison);
+    console.log('투자 추천 전체:', data.recommendation);
+    console.log('목표가 범위:', data.recommendation?.target_price_range);
+    console.log('시장 현황:', data.market_snapshot);
+    console.log('시나리오:', data.scenarios_1y);
+    console.log('현재가:', data.market_snapshot?.current_price);
+    console.log('목표가:', data.recommendation?.target_price_range);
+    console.log('재무 데이터:', {
         revenue: data.financial_summary?.revenue,
         op_income: data.financial_summary?.op_income,
         net_income: data.financial_summary?.net_income
@@ -303,7 +310,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 투자 추천 -->
         <div class="section">
-            <div class="section-title">🎯 투자 추천</div>
+            <div class="section-title">투자 추천</div>
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-label">목표주가</div>
@@ -326,7 +333,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 종합 점수 -->
         <div class="section" style="margin-top: 80px;">
-            <div class="section-title">⭐ 종합 평가 점수</div>
+            <div class="section-title">종합 평가 점수</div>
             <div class="metrics-grid four-columns">
                 <div class="metric-card">
                     <div class="metric-label">재무 점수</div>
@@ -364,7 +371,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 시장 현황 -->
         <div class="section">
-            <div class="section-title">� 시장 현황</div>
+            <div class="section-title">시장 현황</div>
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-label">현재가</div>
@@ -400,13 +407,13 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 주가 차트 -->
         <div class="section">
-            <div class="section-title">� 주가 추이 (6개월)</div>
+            <div class="section-title">주가 추이 (6개월)</div>
             <div id="priceChart" style="height: 400px; width: 100%;"></div>
         </div>
         
         <!-- 기술적 지표 상태 테이블 -->
         <div class="section">
-            <div class="section-title">📊 기술적 지표 상태</div>
+            <div class="section-title">기술적 지표 상태</div>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; background: white; font-size: 0.9em;">
                     <thead>
@@ -425,7 +432,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 기술적 분석 -->
         <div class="section">
-            <div class="section-title">� 기술적 분석</div>
+            <div class="section-title">기술적 분석</div>
             <div class="metrics-grid four-columns">
                 <div class="metric-card">
                     <div class="metric-label">추세</div>
@@ -457,7 +464,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 재무 실적 -->
         <div class="section">
-            <div class="section-title">�💼 재무 실적 (${financial.latest_period || 'N/A'})</div>
+            <div class="section-title">재무 실적 (${financial.latest_period || 'N/A'})</div>
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-label">매출액</div>
@@ -491,13 +498,13 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 재무 성과 차트 -->
         <div class="section">
-            <div class="section-title">� 재무 성과 추이 (4분기)</div>
+            <div class="section-title">재무 성과 추이 (4분기)</div>
             <div id="financialChart" style="height: 400px; width: 100%;"></div>
         </div>
         
         <!-- 재무 비율 트렌드 표 -->
         <div class="section">
-            <div class="section-title">📋 재무 비율 트렌드</div>
+            <div class="section-title">재무 비율 트렌드</div>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; background: white; font-size: 0.9em;">
                     <thead>
@@ -518,7 +525,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 밸류에이션 멀티플 비교표 -->
         <div class="section" id="valuationComparisonSection">
-            <div class="section-title">📊 밸류에이션 멀티플 비교 (섹터 내)</div>
+            <div class="section-title">밸류에이션 멀티플 비교 (섹터 내)</div>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; background: white; font-size: 0.9em;">
                     <thead>
@@ -539,7 +546,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 시나리오 비교 표 -->
         <div class="section">
-            <div class="section-title">🎯 시나리오 비교</div>
+            <div class="section-title">시나리오 비교</div>
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; background: white;">
                     <thead>
@@ -551,17 +558,17 @@ function renderResults(data, chartData, sectorComparison) {
                     </thead>
                     <tbody>
                         <tr style="border-bottom: 1px solid #dee2e6;">
-                            <td style="padding: 12px;"><strong style="color: #059669;">🚀 강세</strong></td>
+                            <td style="padding: 12px;"><strong style="color: #059669;">강세</strong></td>
                             <td style="padding: 12px; color: #059669; font-weight: 600;">${scenarios.bull_case?.expected_return_range || 'N/A'}</td>
                             <td style="padding: 12px; font-size: 0.9em;">${scenarios.bull_case?.description || '-'}</td>
                         </tr>
                         <tr style="border-bottom: 1px solid #dee2e6;">
-                            <td style="padding: 12px;"><strong style="color: #f59e0b;">📊 기본</strong></td>
+                            <td style="padding: 12px;"><strong style="color: #f59e0b;">기본</strong></td>
                             <td style="padding: 12px; color: #f59e0b; font-weight: 600;">${scenarios.base_case?.expected_return_range || 'N/A'}</td>
                             <td style="padding: 12px; font-size: 0.9em;">${scenarios.base_case?.description || '-'}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 12px;"><strong style="color: #ef4444;">⚠️ 약세</strong></td>
+                            <td style="padding: 12px;"><strong style="color: #ef4444;">약세</strong></td>
                             <td style="padding: 12px; color: #ef4444; font-weight: 600;">${scenarios.bear_case?.expected_return_range || 'N/A'}</td>
                             <td style="padding: 12px; font-size: 0.9em;">${scenarios.bear_case?.description || '-'}</td>
                         </tr>
@@ -575,9 +582,9 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 뉴스 & 모멘텀 -->
         <div class="section">
-            <div class="section-title">📰 뉴스 & 모멘텀</div>
+            <div class="section-title">뉴스 & 모멘텀</div>
             <div class="summary-box" style="margin-bottom: 15px;">
-                <p><strong>감성:</strong> ${getSentimentEmoji(news.sentiment)} ${getSentimentText(news.sentiment)}</p>
+                <p><strong>감성:</strong> ${getSentimentText(news.sentiment)}</p>
                 <p><strong>섹터 트렌드:</strong> ${news.sector_trend || 'N/A'}</p>
             </div>
     `;
@@ -604,7 +611,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 리스크 -->
         <div class="section">
-            <div class="section-title">⚠️ 주요 리스크</div>
+            <div class="section-title">주요 리스크</div>
     `;
     
     if (risks.major_risks && risks.major_risks.length > 0) {
@@ -635,7 +642,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 투자 논리 -->
         <div class="section">
-            <div class="section-title">💡 투자 논리</div>
+            <div class="section-title">투자 논리</div>
             <div class="summary-box" style="margin-bottom: 15px;">
                 <h4 style="margin-bottom: 10px;">핵심 투자 포인트</h4>
                 <ul style="padding-left: 20px;">
@@ -671,7 +678,7 @@ function renderResults(data, chartData, sectorComparison) {
         
         <!-- 디버그 정보 (개발용) -->
         <details style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
-            <summary style="cursor: pointer; font-weight: 600; color: #667eea;">🔍 상세 데이터 확인 (클릭)</summary>
+            <summary style="cursor: pointer; font-weight: 600; color: #667eea;">상세 데이터 확인 (클릭)</summary>
             <pre style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px; overflow-x: auto; font-size: 0.85em;">${JSON.stringify(data, null, 2)}</pre>
         </details>
     `;
@@ -830,6 +837,17 @@ function renderResults(data, chartData, sectorComparison) {
     });
 }
 
+// AI 엔진 선택 이벤트 리스너 추가
+document.addEventListener('DOMContentLoaded', function() {
+    const engineOptions = document.querySelectorAll('input[name="aiEngine"]');
+
+    engineOptions.forEach(option => {
+        option.addEventListener('change', () => {
+            console.log(`선택된 AI 엔진: ${option.value}`);
+        });
+    });
+});
+
 // 유틸리티 함수들
 function formatNumber(num) {
     return new Intl.NumberFormat('ko-KR').format(Math.round(num));
@@ -853,12 +871,7 @@ function formatKoreanWon(num) {
 }
 
 function getTrendEmoji(trend) {
-    const emoji = {
-        'uptrend': '🟢',
-        'downtrend': '🔴',
-        'sideways': '🟡'
-    };
-    return emoji[trend] || '⚪';
+    return ''
 }
 
 function getTrendText(trend) {
@@ -871,12 +884,7 @@ function getTrendText(trend) {
 }
 
 function getSentimentEmoji(sentiment) {
-    const emoji = {
-        'positive': '😊',
-        'neutral': '😐',
-        'negative': '😟'
-    };
-    return emoji[sentiment] || '😐';
+    return '';
 }
 
 function getSentimentText(sentiment) {
@@ -929,8 +937,8 @@ function getRsiSignal(rsi) {
     if (!rsi) return '중립';
     if (rsi > 70) return '과매수';
     if (rsi < 30) return '과매도';
-    if (rsi >= 50) return '중립~강세';
-    return '중립~약세';
+    if (rsi >= 50) return '강세';
+    return '약세';
 }
 
 function getRsiSignalColor(rsi) {
