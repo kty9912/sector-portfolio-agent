@@ -24,6 +24,17 @@ app = FastAPI(title="AI 단일 종목 분석 시스템")
 # 정적 파일 서빙
 app.mount("/static", StaticFiles(directory="experiments/templates/stock"), name="static")
 
+# ------------------------------
+#  환경 설정
+# ------------------------------
+CERT_PATH = r"C:\certs\cacert.pem"
+if os.path.exists(CERT_PATH):
+    os.environ['CURL_CA_BUNDLE'] = CERT_PATH
+    os.environ['SSL_CERT_FILE'] = CERT_PATH
+    os.environ['REQUESTS_CA_BUNDLE'] = CERT_PATH
+else:
+    print(f"⚠️ 경고: {CERT_PATH} 파일이 없습니다. yfinance가 작동하지 않을 수 있습니다.")
+    print("해결: python experiments/fix_cert_path.py 실행")
 
 # =====================================================
 # Request Model

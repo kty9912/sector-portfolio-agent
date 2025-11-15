@@ -9,10 +9,14 @@ from core.db import exec_many, exec_sql, fetch_all
 # ------------------------------
 #  환경 설정
 # ------------------------------
-# (한글 경로 이슈 방지용 CA 설정)
-os.environ.setdefault("SSL_CERT_FILE", r"C:\certs\cacert.pem")
-os.environ.setdefault("REQUESTS_CA_BUNDLE", r"C:\certs\cacert.pem")
-os.environ.setdefault("CURL_CA_BUNDLE", r"C:\certs\cacert.pem")
+CERT_PATH = r"C:\certs\cacert.pem"
+if os.path.exists(CERT_PATH):
+    os.environ['CURL_CA_BUNDLE'] = CERT_PATH
+    os.environ['SSL_CERT_FILE'] = CERT_PATH
+    os.environ['REQUESTS_CA_BUNDLE'] = CERT_PATH
+else:
+    print(f"⚠️ 경고: {CERT_PATH} 파일이 없습니다. yfinance가 작동하지 않을 수 있습니다.")
+    print("해결: python experiments/fix_cert_path.py 실행")
 
 # 화이트리스트
 TICKERS = [r[0] for r in fetch_all("SELECT ticker FROM companies WHERE is_active = TRUE ORDER BY ticker;")]
