@@ -217,7 +217,6 @@ async function handleRegularRequest(apiEndpoint, requestData, selectedEngine) {
         });
         
         const result = await response.json();
-        console.log('result', result)
         
         if (result.success) {
             renderResults(result.report, result.iterations);
@@ -368,6 +367,8 @@ function renderResults(reportText, iterations) {
         document.getElementById('resultContent').classList.add('active');
         return;
     }
+
+    console.log('data', data);
     
     // 구조화된 결과 렌더링
     let html = `
@@ -796,13 +797,14 @@ function renderResults(reportText, iterations) {
     });
     
     setTimeout(() => {
-        renderSunburstFromConfig(data.chart_config);
+        renderSunburstFromConfig(data);
         renderPerformanceChart(data);
     }, 300);
 }
 
 // ⭐ renderResults 함수 끝
-function renderSunburstFromConfig(config) {
+function renderSunburstFromConfig(data) {
+    const config = data.chart_config;
     if (!config) {
         createSunburstFromData(data.portfolio_allocation);
         return;
