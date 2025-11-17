@@ -136,8 +136,7 @@ function updateCount(type) {
 
 // 로딩 애니메이션 제어 객체
 const LoadingController = {
-    steps: ['step1', 'step2', 'step3', 'step4', 'step5', 'step6', 'step7', 'step8', 'step9', 'step10', 'step11', 'step12'],
-    stepMessages: [
+    steps: [
         '데이터를 수집하고 있습니다',
         '주가를 분석하고 있습니다',
         '재무제표를 분석하고 있습니다',
@@ -152,293 +151,84 @@ const LoadingController = {
         '보고서를 작성하고 있습니다'
     ],
     currentStep: 0,
-    progress: 0,
-    startTime: null,
-    stepInterval: null,
-    progressInterval: null,
-    timeInterval: null,
-    estimatedDuration: 15000, // 기본 예상 시간 15초
+    interval: null,
     
-    start: function(engine, model, requestData = null) {
-        this.startTime = Date.now();
+    start: function() {
         this.currentStep = 0;
-        this.progress = 0;
+        this.updateStep();
         
-        // 스마트 예상 시간 계산
-        if (requestData) {
-            const complexity = this.calculateComplexity(requestData);
-            this.estimatedDuration = this.getEstimatedTime(complexity);
-        } else {
-            this.estimatedDuration = 20000
-        }
-        
+        this.interval = setInterval(() => {
+            this.currentStep = (this.currentStep + 1) % this.steps.length;
+            this.updateStep();
+        }, 2000);
+    },
+    
+    updateStep: function() {
+        const stepMessage = document.getElementById('stepMessage');
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
         
-        // 초기화
-        const stepMessageEl = document.getElementById('stepMessage');
-        if (stepMessageEl) {
-            const initialTime = Math.ceil(this.estimatedDuration / 1000);
-            const initialMessage = `${this.stepMessages[0]} (${initialTime}초 남음)`;
-            stepMessageEl.textContent = initialMessage;
+        if (stepMessage) {
+            stepMessage.textContent = this.steps[this.currentStep];
         }
         
-        if (progressFill) progressFill.style.width = '0%';
-        if (progressText) progressText.textContent = '0%';
+        const progress = Math.floor((this.currentStep / this.steps.length) * 100);
         
-        this.currentStep = 0;
+        if (progressFill) {
+            progressFill.style.width = progress + '%';
+        }
         
-        this.startProgressAnimation();
-        this.startTimeEstimation();
-    },
-    
-    activateStep: function(stepIndex) {
-        if (stepIndex >= 0 && stepIndex < this.steps.length && stepIndex !== this.currentStep) {
-            const stepMessageEl = document.getElementById('stepMessage');
-            
-            if (stepMessageEl) {
-                const message = this.stepMessages[stepIndex];
-                const remainingTime = this.getRemainingTime();
-                
-                if (remainingTime > 0 && this.progress < 95) {
-                    stepMessageEl.textContent = `${message} (${remainingTime}초 남음)`;
-                } else {
-                    stepMessageEl.textContent = message;
-                }
-            }
-            
-            this.currentStep = stepIndex;
+        if (progressText) {
+            progressText.textContent = progress + '%';
         }
     },
     
-    updateProgress: function(percent) {
+    stop: function() {
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+        
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
         
         if (progressFill) {
-            progressFill.style.width = `${percent}%`;
+            progressFill.style.width = '100%';
         }
         
         if (progressText) {
-            progressText.textContent = `${Math.round(percent)}%`;
+            progressText.textContent = '100%';
         }
-        
-        // 진행률에 따라 단계 활성화 (12단계)
-        const stepIndex = Math.min(Math.floor(percent / 8.33), 11); // 100/12 = 8.33
-        if (stepIndex !== this.currentStep) {
-            this.activateStep(stepIndex);
-        }
-        
-        this.progress = percent;
-    },
-    
-    startProgressAnimation: function() {
-        // 기본적인 진행률 애니메이션 (실제 API 응답이 없을 때의 fallback)
-        this.progressInterval = setInterval(() => {
-            const elapsed = Date.now() - this.startTime;
-            
-            // 처음 10초는 빠르게, 그 후는 천천히
-            let targetProgress;
-            if (elapsed < 10000) {
-                targetProgress = (elapsed / 10000) * 60; // 10초에 60%까지
-            } else {
-                targetProgress = 60 + ((elapsed - 10000) / 20000) * 35; // 추가 20초에 35%
-            }
-            
-            targetProgress = Math.min(targetProgress, 95); // 95%까지만
-            
-            if (this.progress < targetProgress) {
-                this.updateProgress(Math.min(this.progress + 1, targetProgress));
-            }
-        }, 100);
-    },
-    
-    complete: function() {
-        // 로딩 완료
-        this.updateProgress(100);
-        
-        // 마지막 단계 활성화
-        this.activateStep(11);
-        
-        // 완료 메시지 표시
-        setTimeout(() => {
-            const stepMessageEl = document.getElementById('stepMessage');
-            if (stepMessageEl) {
-                stepMessageEl.textContent = '분석이 완료되었습니다!';
-            }
-        }, 500);
-        
-        // 타이머 정리
-        if (this.progressInterval) {
-            clearInterval(this.progressInterval);
-            this.progressInterval = null;
-        }
-        
-        if (this.timeInterval) {
-            clearInterval(this.timeInterval);
-            this.timeInterval = null;
-        }
-        
-        setTimeout(() => {
-            this.reset();
-        }, 1500);
-    },
-    
-    reset: function() {
-        if (this.progressInterval) {
-            clearInterval(this.progressInterval);
-            this.progressInterval = null;
-        }
-        
-        if (this.timeInterval) {
-            clearInterval(this.timeInterval);
-            this.timeInterval = null;
-        }
-        
-        this.currentStep = 0;
-        this.progress = 0;
-        this.startTime = null;
-    },
-    
-    // 외부에서 특정 단계로 점프할 수 있는 메서드
-    jumpToStep: function(stepIndex, progress = null) {
-        this.activateStep(stepIndex);
-        if (progress !== null) {
-            this.updateProgress(progress);
-        }
-    },
-    
-    // 수동으로 진행률 증가
-    incrementProgress: function(amount = 5) {
-        const newProgress = Math.min(this.progress + amount, 95);
-        this.updateProgress(newProgress);
-    },
-    
-    // 예상 시간 표시 기능 (stepMessage를 사용하므로 간소화)
-    startTimeEstimation: function() {
-        // 1초마다 시간 업데이트
-        this.timeInterval = setInterval(() => {
-            this.updateTimeDisplay();
-        }, 1000);
-    },
-    
-    getRemainingTime: function() {
-        if (!this.startTime) return 0;
-        const elapsed = Date.now() - this.startTime;
-        const remaining = Math.max(0, this.estimatedDuration - elapsed);
-        return Math.ceil(remaining / 1000);
-    },
-    
-    updateTimeDisplay: function() {
-        const stepMessageEl = document.getElementById('stepMessage');
-        if (stepMessageEl && this.progress < 95) {
-            const message = this.stepMessages[this.currentStep];
-            const remainingTime = this.getRemainingTime();
-            
-            if (remainingTime > 0) {
-                stepMessageEl.textContent = `${message} (${remainingTime}초 남음)`;
-            } else {
-                stepMessageEl.textContent = message;
-            }
-        }
-    },
-    
-    getStatusMessage: function(stepIndex) {
-        return this.stepMessages[stepIndex] || 'AI가 포트폴리오를 분석하고 있습니다...';
-    },
-    
-    // 요청 복잡도 계산
-    calculateComplexity: function(requestData) {
-        let complexity = 1;
-        
-        const sectors = requestData.investment_targets?.sectors || [];
-        const stocks = requestData.investment_targets?.tickers || [];
-        const totalItems = sectors.length + stocks.length;
-        complexity += totalItems * 0.2;
-        
-        if (requestData.budget) {
-            const amount = requestData.budget;
-            if (amount > 100000000) complexity += 0.5;
-            if (amount > 500000000) complexity += 0.3;
-        }
-        
-        if (requestData.investment_period === 'long') {
-            complexity += 0.2;
-        }
-        
-        if (requestData.risk_profile === 'conservative') {
-            complexity += 0.3;
-        }
-        
-        return Math.min(complexity, 3);
-    },
-    
-    // 예상 시간 계산
-    getEstimatedTime: function(complexity) {
-        const estimatedTime = 18000 * complexity;
-        return estimatedTime;
     }
 };
 
-// 기존 함수는 호환성을 위해 유지 (requestData 추가)
-function startLoadingAnimation(engine, model, requestData = null) {
-    LoadingController.start(engine, model, requestData);
+// 포트폴리오 분석 실행 함수
+function startLoadingAnimation() {
+    LoadingController.start();
 }
 
-// 스마트 추정 기반 요청 처리
+// 요청 처리
 async function handleRegularRequest(apiEndpoint, requestData, selectedEngine) {
-    const startTime = Date.now();
-    
-    // LoadingController에서 이미 복잡도 분석과 예상 시간이 설정되어 있음
-    const estimatedTime = LoadingController.estimatedDuration;
-    
-    // 동적 진행률 시작
-    const progressUpdater = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const estimatedProgress = Math.min((elapsed / estimatedTime) * 90, 90);
-        
-        // 단계별 진행률 매핑 (12단계)
-        const stepIndex = Math.floor(estimatedProgress / 8.33); // 100/12 = 8.33
-        if (LoadingController.currentStep !== stepIndex && estimatedProgress > LoadingController.progress) {
-            LoadingController.activateStep(stepIndex);
-        }
-    }, 500);
-    
     try {
-        // 1-3단계: 요청 전송 및 데이터 수집
-        LoadingController.jumpToStep(0, 8);   // 데이터 수집
-        
         const response = await fetch(apiEndpoint, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(requestData)
         });
         
-        // 4-6단계: 분석 시작
-        LoadingController.jumpToStep(3, 33);  // 뉴스 검색
-        
         const result = await response.json();
         console.log('result', result)
         
-        // 7-9단계: 전략 최적화
-        LoadingController.jumpToStep(6, 58);  // 포트폴리오 구성 분석
-        
         if (result.success) {
-            // 10-11단계: 차트 생성
-            LoadingController.jumpToStep(9, 83); // 차트 생성
             renderResults(result.report, result.iterations);
-            
-            // 12단계: 보고서 작성 완료
-            LoadingController.jumpToStep(11, 95);
-            
-            setTimeout(() => {
-                LoadingController.complete();
-            }, 500);
+            LoadingController.stop();
         } else {
             throw new Error(result.detail || '분석 실패');
         }
-    } finally {
-        clearInterval(progressUpdater);
+    } catch (error) {
+        console.error('분석 실패:', error);
+        alert('분석 중 오류가 발생했습니다: ' + error.message);
+        LoadingController.stop();
     }
 }
 
@@ -527,18 +317,17 @@ document.getElementById('portfolioForm').addEventListener('submit', async (e) =>
     document.getElementById('resultContent').classList.remove('active');
     document.getElementById('analyzeBtn').disabled = true;
     
-    // 로딩 애니메이션 시작 (requestData 전달로 스마트 추정)
-    startLoadingAnimation(selectedEngine, selectedModel, requestData);
+    // 로딩 애니메이션 시작
+    startLoadingAnimation();
     
     // 선택된 엔진 표시
     const engineDisplay = selectedEngine === 'langgraph' ? 'LangGraph' : 'Anthropic';
 
     try {
-        // 스마트 추정 방식으로 요청 처리
         await handleRegularRequest(apiEndpoint, requestData, selectedEngine);
         
     } catch (error) {
-        LoadingController.complete();
+        LoadingController.stop();
         
         document.getElementById('resultContent').innerHTML = `
             <div style="background: #fee; border: 2px solid #fcc; border-radius: 12px; padding: 30px; color: #c33;">
@@ -624,10 +413,22 @@ function renderResults(reportText, iterations) {
                 .replace(/News Agent:\s*/gi, '')
                 .trim();
             
+            // 색상 HEX를 RGB로 변환
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : null;
+            };
+            
+            const rgb = hexToRgb(expertColor);
+            const bgColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)` : 'rgba(128, 128, 128, 0.08)';
+            
             html += `
                 <div style="
-                    background: linear-gradient(135deg, ${expertColor}15 0%, ${expertColor}05 100%);
-                    border-left: 4px solid ${expertColor};
+                    background: ${bgColor};
                     padding: 15px;
                     border-radius: 8px;
                     margin-bottom: 10px;
@@ -813,7 +614,7 @@ function renderResults(reportText, iterations) {
         </div>
         
         <!-- 투자 책임 경고 -->
-        <div class="disclaimer" style="background: rgba(255, 243, 205, 0.3); border-left: 4px solid #ffc107; border-radius: 8px; padding: 20px; margin-top: 40px;">
+        <div class="disclaimer" style="background: rgba(255, 243, 205, 0.3); border-radius: 8px; padding: 20px; margin-top: 40px;">
             <p style="color: #495057; font-size: 0.9em; line-height: 1.6; margin: 0;">
                 ⚠️ <strong style="color: #f39c12;">투자 유의사항</strong><br>
                 본 분석 결과는 AI 알고리즘 기반의 참고 자료이며, 투자 권유나 종목 추천이 아닙니다. 
@@ -867,7 +668,6 @@ function renderResults(reportText, iterations) {
                         }
                         .summary-box {
                             background: #f8f9fa;
-                            border-left: 4px solid #667eea;
                             padding: 15px;
                             margin: 10px 0;
                             line-height: 1.6;
@@ -937,7 +737,6 @@ function renderResults(reportText, iterations) {
                         /* ⭐ 전문가 의견 스타일 (PDF용) */
                         .expert-opinion-card {
                             background: #f8f9fa;
-                            border-left: 4px solid #667eea;
                             padding: 12px;
                             border-radius: 6px;
                             margin-bottom: 12px;

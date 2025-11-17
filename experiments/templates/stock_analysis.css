@@ -198,6 +198,24 @@ body {
     cursor: not-allowed;
 }
 
+.btn-secondary {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
 .result-panel {
     min-height: 800px;
 }
@@ -273,9 +291,13 @@ body {
 
 .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 15px;
     margin: 20px 0;
+}
+
+.metrics-grid.four-columns {
+    grid-template-columns: repeat(4, 1fr);
 }
 
 .metric-card {
@@ -361,7 +383,7 @@ body {
     background: #e9ecef;
     border-radius: 4px;
     overflow: hidden;
-    margin-top: 5px;
+    margin: 5px auto 0 auto;
     max-width: 100px;
 }
 
@@ -666,7 +688,7 @@ body {
     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
     border-radius: 10px;
     width: 0%;
-    transition: width 1.5s ease-out;
+    transition: width 0.5s ease;
     box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
 }
 
@@ -735,3 +757,4 @@ body {
         font-size: 1.5em;
     }
 }
+

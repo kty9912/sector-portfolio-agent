@@ -486,7 +486,7 @@ async def download_pdf(request: dict):
                 /* 투자 책임 경고 - PDF용 */
                 .disclaimer {
                     background: #fff3cd !important;
-                    border: 2px solid #ffc107 !important;
+                    border: none !important;
                     border-radius: 8px !important;
                     padding: 15px !important;
                     margin-top: 30px !important;
