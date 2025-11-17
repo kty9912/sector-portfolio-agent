@@ -411,6 +411,26 @@ def search_stock_news(ticker: str, company_name: str, limit: int = 5) -> dict:
         print(f"  > !!! 종목 뉴스 검색 에러: {e}")
         return {"error": str(e)}
 
+@tool
+def get_financial_metrics(ticker: str) -> dict:
+    """
+    PostgreSQL에서 특정 종목의 재무 지표 가져오기
+    """
+    from core.db import fetch_dicts
+    
+    sql = """
+        SELECT ticker, revenue, net_income, roe, debt_ratio, report_date
+        FROM financial_statements
+        WHERE ticker = %s
+        ORDER BY report_date DESC
+        LIMIT 4  -- 최근 4분기
+    """
+    
+    results = fetch_dicts(sql, [ticker])
+    return {
+        "ticker": ticker,
+        "quarterly_data": results
+    }
 
 # --- 6. 툴 리스트 ---
 available_tools = [
@@ -419,7 +439,8 @@ available_tools = [
     search_sector_news_qdrant,
     get_multiple_sectors_momentum,
     search_multiple_sectors_news,
-    search_stock_news
+    search_stock_news,
+    get_financial_metrics
 ]
 
 # --- Qdrant 컬렉션 확인 (초기화 X) ---

@@ -217,6 +217,7 @@ async function handleRegularRequest(apiEndpoint, requestData, selectedEngine) {
         });
         
         const result = await response.json();
+        console.log('result', result)
         
         if (result.success) {
             renderResults(result.report, result.iterations);
