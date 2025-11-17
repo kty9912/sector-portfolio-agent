@@ -418,6 +418,7 @@ async function handleRegularRequest(apiEndpoint, requestData, selectedEngine) {
         LoadingController.jumpToStep(3, 33);  // 뉴스 검색
         
         const result = await response.json();
+        console.log('result', result)
         
         // 7-9단계: 전략 최적화
         LoadingController.jumpToStep(6, 58);  // 포트폴리오 구성 분석

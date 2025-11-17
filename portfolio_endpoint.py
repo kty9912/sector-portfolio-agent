@@ -288,7 +288,11 @@ async def analyze_langgraph(request: Request):
         )
         
         # 결과 반환
-        return JSONResponse(content=result)
+        return JSONResponse(content={
+                "success": True,
+                "report": json.dumps(result, ensure_ascii=False),
+                "iterations": 1
+            })
         
     except Exception as e:
         print("에러:", e)

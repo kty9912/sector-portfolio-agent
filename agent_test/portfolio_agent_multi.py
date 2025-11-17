@@ -1221,6 +1221,20 @@ def run_multi_agent_portfolio(
     
     final_state = graph.invoke(initial_state)
     
+    
+    import json
+    print("\n====== 최종 API 응답 JSON ======")
+    print(json.dumps({
+        "success": True,
+        "ai_summary": final_state.get("ai_summary"),
+        "portfolio_allocation": final_state.get("portfolio_allocation"),
+        "performance_metrics": final_state.get("performance_metrics"),
+        "chart_data": final_state.get("chart_data"),
+        "discussion_history": final_state.get("discussion_history")
+    }, ensure_ascii=False, indent=2))
+    print("================================\n")
+
+
     print(f"\n{'='*60}")
     print(f"✅ 멀티 에이전트 분석 완료!")
     print(f"{'='*60}\n")
