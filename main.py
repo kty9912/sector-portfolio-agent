@@ -2,16 +2,17 @@ import os
 from fastapi import FastAPI, Query, HTTPException, Request
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 from typing import List, Dict, Any
-# --- [Main] 핵심 모듈 임포트 ---
-# .env 로드 이후에 임포트해야, 이 모듈들이 API 키를 올바르게 읽을 수 있습니다.
-from langchain_core.messages import HumanMessage # HumanMessage 임포트 추가
 
 # --- [Main] .env 파일 로드 (가장 먼저 실행!) ---
 # 'core'나 'agents' 모듈이 임포트되기 *전에* .env를 로드해야 합니다.
 load_dotenv()
 print("--- [Main] .env 파일 로드 완료 ---")
 
+# --- [Main] 핵심 모듈 임포트 ---
+# .env 로드 이후에 임포트해야, 이 모듈들이 API 키를 올바르게 읽을 수 있습니다.
+from langchain_core.messages import HumanMessage # HumanMessage 임포트 추가
 
 try:
     # 이 임포트가 성공하려면, 
