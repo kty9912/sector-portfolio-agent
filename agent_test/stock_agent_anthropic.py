@@ -300,64 +300,21 @@ def get_technical_signals(ticker: str) -> Dict[str, Any]:
 
 
 def get_news_sentiment(ticker: str, company_name: str) -> Dict[str, Any]:
-    """뉴스 감성 분석 (더미 데이터)"""
+    """뉴스 감성 분석 (실제 데이터)"""
     try:
-        # 더미 뉴스 데이터 생성
-        import random
+        from agents.tools import search_realtime_news_tavily, search_stock_news
+
+        # Tavily를 사용하여 실시간 뉴스 검색
+        tavily_news = search_realtime_news_tavily.invoke({"query": company_name})['results']
+        qdrant_news = search_stock_news.invoke({"ticker": ticker, "company_name": company_name})['news']
         
-        # 업종별 뉴스 템플릿
-        news_templates = {
-            "positive": [
-                f"{company_name}, 신제품 출시로 시장 점유율 확대 전망",
-                f"{company_name}, 분기 실적 서프라이즈... 영업이익 30% 증가",
-                f"{company_name}, 글로벌 시장 진출 본격화... 수출 급증",
-                f"{company_name}, 기술 혁신으로 업계 선두 입지 강화",
-                f"{company_name}, 대규모 투자 유치 성공... 성장 동력 확보"
-            ],
-            "neutral": [
-                f"{company_name}, 정기 주주총회 개최... 배당 정책 논의",
-                f"{company_name}, 신임 CEO 선임... 경영 정상화 기대",
-                f"{company_name}, 업계 동향 주시 중... 전략 재검토",
-                f"{company_name}, 시장 변화에 따른 사업 구조 조정",
-                f"{company_name}, 분기 실적 발표 예정... 시장 관심 집중"
-            ],
-            "negative": [
-                f"{company_name}, 경쟁 심화로 수익성 악화 우려",
-                f"{company_name}, 원자재 가격 상승으로 마진 압박",
-                f"{company_name}, 글로벌 경기 둔화 영향... 실적 하향",
-                f"{company_name}, 규제 강화로 사업 환경 악화",
-                f"{company_name}, 주요 고객사 이탈... 매출 감소 전망"
-            ]
-        }
-        
-        # 랜덤 감성 선택 (가중치: positive 40%, neutral 40%, negative 20%)
-        sentiment_choice = random.choices(
-            ["positive", "neutral", "negative"],
-            weights=[0.4, 0.4, 0.2],
-            k=1
-        )[0]
-        
-        # 뉴스 3-5개 생성
-        num_news = random.randint(3, 5)
+        all_news = tavily_news + qdrant_news
         news_list = []
         
-        for _ in range(num_news):
-            # 주로 선택된 감성, 가끔 다른 감성
-            current_sentiment = sentiment_choice if random.random() > 0.3 else random.choice(["positive", "neutral", "negative"])
-            title = random.choice(news_templates[current_sentiment])
-            
-            # 감성 점수 (-1.0 ~ 1.0)
-            if current_sentiment == "positive":
-                score = random.uniform(0.3, 0.9)
-            elif current_sentiment == "negative":
-                score = random.uniform(-0.9, -0.3)
-            else:
-                score = random.uniform(-0.2, 0.2)
-            
+        for news in all_news:
             news_list.append({
-                "title": title,
-                "sentiment_score": score,
-                "date": "2025-11-14"
+                "title": news['title'],
+                "sentiment_score": news.get('sentiment_score', news.get('score', 0)),
             })
         
         # 평균 감성 점수
