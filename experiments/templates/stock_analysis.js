@@ -433,24 +433,23 @@ function renderResults(data, chartData, sectorComparison) {
         <!-- 기술적 분석 -->
         <div class="section">
             <div class="section-title">기술적 분석</div>
+            <!-- 연결 테스트 -->
             <div class="metrics-grid four-columns">
                 <div class="metric-card">
                     <div class="metric-label">추세</div>
-                    <div class="metric-value" style="font-size: 0.95em;">
-                        ${getTrendText(technical.trend)}
-                    </div>
+                    <div class="metric-value">${getTrendText(technical.trend)}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">RSI (14일)</div>
-                    <div class="metric-value" style="font-size: 0.95em;">${(technical.rsi14 || 50).toFixed(1)}</div>
+                    <div class="metric-value">${(technical.rsi14 || 50).toFixed(1)}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">모멘텀 (20일)</div>
-                    <div class="metric-value" style="font-size: 0.95em;">${formatPercent(technical.momentum_20d || 0)}</div>
+                    <div class="metric-value">${formatPercent(technical.momentum_20d || 0)}</div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">변동성</div>
-                    <div class="metric-value" style="font-size: 0.95em;">${getVolatilityText(technical.volatility_20d_level)}</div>
+                    <div class="metric-value">${getVolatilityText(technical.volatility_20d_level)}</div>
                 </div>
             </div>
             <div class="summary-box" style="margin-top: 20px;">
@@ -998,9 +997,9 @@ function getVolatilitySignalColor(level) {
 
 function getVolatilityText(level) {
     const texts = {
-        'low': '낮음 (안정)',
+        'low': '낮음',
         'medium': '보통',
-        'high': '높음 (주의)'
+        'high': '높음'
     };
     return texts[level] || '데이터 없음';
 }

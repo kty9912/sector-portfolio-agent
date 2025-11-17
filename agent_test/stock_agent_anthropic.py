@@ -305,8 +305,12 @@ def get_news_sentiment(ticker: str, company_name: str) -> Dict[str, Any]:
         from agents.tools import search_realtime_news_tavily, search_stock_news
 
         # Tavily를 사용하여 실시간 뉴스 검색
-        tavily_news = search_realtime_news_tavily.invoke({"query": company_name})['results']
-        qdrant_news = search_stock_news.invoke({"ticker": ticker, "company_name": company_name})['news']
+        tavily_news = search_realtime_news_tavily.invoke({"query": company_name})
+        if type(tavily_news) == str:
+            tavily_news = []
+        else:
+            tavily_news = tavily_news.get('results', [])
+        qdrant_news = search_stock_news.invoke({"ticker": ticker, "company_name": company_name}).get('news', [])
         
         all_news = tavily_news + qdrant_news
         news_list = []
