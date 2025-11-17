@@ -33,6 +33,15 @@ from agent_test.stock_agent_anthropic import (
     INDUSTRY_CODE_MAP
 )
 
+MAX_RETRIES = 2
+
+def merge_retries(left: Dict[str, int], right: Dict[str, int]) -> Dict[str, int]:
+    merged = dict(left)
+    for k, v in right.items():
+        # 가장 최근 값 / 더 큰 값 / 누적값 중 원하는 정책 택하면 됨
+        merged[k] = max(merged.get(k, 0), v)
+    return merged
+
 # =====================================================
 # State 정의
 # =====================================================
@@ -60,10 +69,20 @@ class AnalysisState(TypedDict):
     
     # 최종 결과
     final_report: Dict[str, Any]
-    
+
+    # 검증/재시도 관리
+    retries: Annotated[Dict[str, int], merge_retries] # 예: {'financial': 0, 'technical': 0, 'news': 0, 'synthesizer': 0}
+    financial_validation: Dict[str, Any]
+    technical_validation: Dict[str, Any]
+    news_validation: Dict[str, Any]
+    synthesizer_validation: Dict[str, Any]
+    ready_flags: Dict[str, bool]
+    all_ready: bool
+
     # 메타
     messages: Annotated[List, operator.add]
     errors: Annotated[List[str], operator.add]
+    validation_errors: Annotated[List[str], operator.add]
 
 
 # =====================================================
@@ -201,6 +220,76 @@ def financial_analyst(state: AnalysisState) -> Dict[str, Any]:
         print(f"   ❌ 재무 분석 실패: {e}")
         return {"financial_analysis": {"error": str(e)}, "errors": [f"financial_analysis: {str(e)}"]}
 
+def validate_financial(state: AnalysisState) -> Dict[str, Any]:
+    """재무 분석 결과 검증 노드"""
+    print("\n✅ [Validator] 재무 분석 결과 검증 중...")
+
+    result = state.get("financial_analysis") or {}
+    errors: List[str] = []
+
+    # 1) 비어있는지 체크
+    if not result:
+        errors.append("financial_analysis is empty")
+
+    # 2) error 필드 존재 여부
+    if "error" in result:
+        errors.append(f"financial_analysis error: {result['error']}")
+
+    # 3) 필수 키 존재 여부
+    required_keys = ["market_snapshot", "financial_summary", "financial_score"]
+    for key in required_keys:
+        if key not in result:
+            errors.append(f"financial_analysis missing key: {key}")
+
+    # 4) 점수 범위 체크
+    score = result.get("financial_score")
+    if not isinstance(score, (int, float)):
+        errors.append(f"financial_score is not numeric: {score}")
+    else:
+        if not (0 <= score <= 100):
+            errors.append(f"financial_score out of range (0~100): {score}")
+
+    is_valid = len(errors) == 0
+
+    # 재시도 카운트 업데이트
+    retries = dict(state.get("retries", {}))
+    if not is_valid:
+        retries["financial"] = retries.get("financial", 0) + 1
+
+    # 로그 출력
+    if is_valid:
+        print("   ✓ 재무 분석 검증 통과")
+    else:
+        print(f"   ❌ 재무 분석 검증 실패 (retries={retries.get('financial', 0)}):")
+        for e in errors:
+            print(f"      - {e}")
+
+    return {
+        "retries": retries,
+        "financial_validation": {"is_valid": is_valid},
+        "validation_errors": errors,
+    }
+
+def route_after_validate_financial(state: AnalysisState) -> str:
+    """
+    재무 분석 검증 후 다음 노드 결정:
+    - "ok"      → synth로 진행
+    - "retry"   → financial_analyst 다시 호출
+    - "degraded"→ 더 이상 재시도 불가, 그래도 synth로 진행
+    """
+    v = state.get("financial_validation") or {}
+    is_valid = v.get("is_valid", False)
+    retries = state.get("retries", {}).get("financial", 0)
+
+    if is_valid:
+        return "ok"
+
+    # 유효하지 않은 경우
+    if retries < MAX_RETRIES:
+        return "retry"
+
+    # 재시도 한계 초과: degraded 상태지만 그래도 synth로 넘김
+    return "degraded"
 
 def technical_analyst(state: AnalysisState) -> Dict[str, Any]:
     """기술적 분석 전문가"""
@@ -267,6 +356,90 @@ def technical_analyst(state: AnalysisState) -> Dict[str, Any]:
         print(f"   ❌ 기술적 분석 실패: {e}")
         return {"technical_analysis": {"error": str(e)}, "errors": [f"technical_analysis: {str(e)}"]}
 
+def validate_technical(state: AnalysisState) -> Dict[str, Any]:
+    """기술적 분석 결과 검증 노드"""
+    print("\n✅ [Validator] 기술적 분석 결과 검증 중...")
+
+    result = state.get("technical_analysis") or {}
+    errors: List[str] = []
+
+    # 1) 비어 있는지 체크
+    if not result:
+        errors.append("technical_analysis is empty")
+
+    # 2) error 필드 존재 여부
+    if "error" in result:
+        errors.append(f"technical_analysis error: {result['error']}")
+
+    # 3) 필수 키 존재 여부 (바깥 레벨)
+    required_keys = ["technical_analysis", "technical_score"]
+    for key in required_keys:
+        if key not in result:
+            errors.append(f"technical_analysis missing key: {key}")
+
+    # 4) 점수 범위 체크
+    score = result.get("technical_score")
+    if not isinstance(score, (int, float)):
+        errors.append(f"technical_score is not numeric: {score}")
+    else:
+        if not (0 <= score <= 100):
+            errors.append(f"technical_score out of range (0~100): {score}")
+
+    # 5) (선택) 안쪽 tech 구조도 살짝 체크
+    inner = result.get("technical_analysis") or {}
+    if not isinstance(inner, dict):
+        errors.append("technical_analysis field must be an object")
+    else:
+        # 예: RSI 값 범위
+        rsi = inner.get("rsi14")
+        if rsi is not None:
+            try:
+                rsi_val = float(rsi)
+                if not (0 <= rsi_val <= 100):
+                    errors.append(f"rsi14 out of range (0~100): {rsi_val}")
+            except Exception:
+                errors.append(f"rsi14 is not numeric: {rsi}")
+
+    is_valid = len(errors) == 0
+
+    # 재시도 카운트 업데이트
+    retries = dict(state.get("retries", {}))
+    if not is_valid:
+        retries["technical"] = retries.get("technical", 0) + 1
+
+    # 로그 출력
+    if is_valid:
+        print("   ✓ 기술적 분석 검증 통과")
+    else:
+        print(f"   ❌ 기술적 분석 검증 실패 (retries={retries.get('technical', 0)}):")
+        for e in errors:
+            print(f"      - {e}")
+
+    return {
+        "retries": retries,
+        "technical_validation": {"is_valid": is_valid},
+        "validation_errors": errors,
+    }
+
+def route_after_validate_technical(state: AnalysisState) -> str:
+    """
+    기술적 분석 검증 후 다음 노드 결정:
+    - "ok"      → synth로 진행
+    - "retry"   → technical_analyst 다시 호출
+    - "degraded"→ 더 이상 재시도 불가, 그래도 synth로 진행
+    """
+    v = state.get("technical_validation") or {}
+    is_valid = v.get("is_valid", False)
+    retries = state.get("retries", {}).get("technical", 0)
+
+    if is_valid:
+        return "ok"
+
+    if retries < MAX_RETRIES:
+        return "retry"
+
+    # 재시도 한계 초과: degraded 상태지만 synth로 넘김
+    return "degraded"
 
 def news_analyst(state: AnalysisState) -> Dict[str, Any]:
     """뉴스 분석 전문가"""
@@ -319,6 +492,143 @@ def news_analyst(state: AnalysisState) -> Dict[str, Any]:
         print(f"   ❌ 뉴스 분석 실패: {e}")
         return {"news_analysis": {"error": str(e)}, "errors": [f"news_analysis: {str(e)}"]}
 
+def validate_news(state: AnalysisState) -> Dict[str, Any]:
+    """뉴스 분석 결과 검증 노드"""
+    print("\n✅ [Validator] 뉴스 분석 결과 검증 중...")
+
+    result = state.get("news_analysis") or {}
+    errors: List[str] = []
+
+    # 1) 비어 있는지 체크
+    if not result:
+        errors.append("news_analysis is empty")
+
+    # 2) error 필드 존재 여부
+    if "error" in result:
+        errors.append(f"news_analysis error: {result['error']}")
+
+    # 3) 필수 키 존재 여부
+    required_keys = ["news_and_momentum", "news_score"]
+    for key in required_keys:
+        if key not in result:
+            errors.append(f"news_analysis missing key: {key}")
+
+    # 4) 점수 범위 체크
+    score = result.get("news_score")
+    if not isinstance(score, (int, float)):
+        errors.append(f"news_score is not numeric: {score}")
+    else:
+        if not (0 <= score <= 100):
+            errors.append(f"news_score out of range (0~100): {score}")
+
+    # 5) 안쪽 구조 간단 체크
+    inner = result.get("news_and_momentum") or {}
+    if not isinstance(inner, dict):
+        errors.append("news_and_momentum field must be an object")
+    else:
+        # 최근 뉴스 하이라이트 최소 1개
+        highlights = inner.get("recent_news_highlights")
+        if not isinstance(highlights, list) or len(highlights) == 0:
+            errors.append("recent_news_highlights must be a non-empty list")
+
+        # sentiment 값이 있다면 허용 범위 안인지
+        sentiment = inner.get("sentiment")
+        if sentiment is not None:
+            allowed = {"positive", "neutral", "negative"}
+            if sentiment not in allowed:
+                errors.append(f"sentiment must be one of {allowed}, got: {sentiment}")
+
+    is_valid = len(errors) == 0
+
+    # 재시도 카운트 업데이트
+    retries = dict(state.get("retries", {}))
+    if not is_valid:
+        retries["news"] = retries.get("news", 0) + 1
+
+    # 로그 출력
+    if is_valid:
+        print("   ✓ 뉴스 분석 검증 통과")
+    else:
+        print(f"   ❌ 뉴스 분석 검증 실패 (retries={retries.get('news', 0)}):")
+        for e in errors:
+            print(f"      - {e}")
+
+    # 여기서 반환하는 값은 LangGraph가 state에 merge
+    return {
+        "retries": retries,
+        "news_validation": {"is_valid": is_valid},
+        "validation_errors": errors,
+    }
+
+def route_after_validate_news(state: AnalysisState) -> str:
+    """
+    뉴스 분석 검증 후 다음 노드 결정:
+    - "ok"      → hub/게이트로 진행
+    - "retry"   → news_analyst 다시 호출
+    - "degraded"→ 더 이상 재시도 불가, 그래도 hub로 진행
+    """
+    v = state.get("news_validation") or {}
+    is_valid = v.get("is_valid", False)
+    retries = state.get("retries", {}).get("news", 0)
+
+    if is_valid:
+        return "ok"
+
+    if retries < MAX_RETRIES:
+        return "retry"
+
+    # 재시도 한계 초과: degraded 상태지만 그래도 다음 단계로 넘김
+    return "degraded"
+
+def analysis_hub(state: AnalysisState) -> Dict[str, Any]:
+    """
+    세 개 에이전트/검증 결과를 모아서
+    '이제 synth 돌려도 되나?' 플래그만 관리하는 허브 노드
+    """
+    try:
+        flags = dict(state.get("ready_flags") or {
+            "financial": False,
+            "technical": False,
+            "news": False,
+        })
+        all_ready = state.get("all_ready", False)
+
+        # 재무 쪽: 검증 통과했거나, 재시도 초과로 degraded 상태면 '준비됨'으로 간주
+        fin_val = state.get("financial_validation") or {}
+        if fin_val.get("is_valid"):
+            flags["financial"] = True
+
+        tech_val = state.get("technical_validation") or {}
+        if tech_val.get("is_valid"):
+            flags["technical"] = True
+
+        news_val = state.get("news_validation") or {}
+        if news_val.get("is_valid"):
+            flags["news"] = True
+
+        all_ready = flags["financial"] and flags["technical"] and flags["news"]
+
+        print(f"🧩 [Hub] ready_flags={flags}, all_ready={all_ready}")
+    except Exception as e:
+        print(f"   ❌ Hub 처리 중 오류: {e}")
+
+    return {
+        "ready_flags": flags,
+        "all_ready": all_ready,
+    }
+
+def route_from_hub(state: AnalysisState) -> str:
+    flags = state.get("ready_flags")
+    all_ready = state.get("all_ready")
+    if all_ready:
+        result = "go_synth"
+    else:
+        result = "wait"
+    return result
+
+def hub_wait(state: AnalysisState) -> Dict[str, Any]:
+    print("⏸ [Hub Wait] 아직 모든 분석이 준비되지 않았습니다.")
+    return {}  # state 그대로 유지
 
 # =====================================================
 # 통합 분석 노드
@@ -427,7 +737,8 @@ def synthesizer(state: AnalysisState) -> Dict[str, Any]:
 1. 각 전문가의 분석을 모두 반영하세요
 2. 전문가 분석의 데이터를 그대로 사용하되, 필요시 보완하세요
 3. overall_score는 세 점수의 가중평균으로 계산하세요
-4. 반드시 완전한 JSON을 ```json 블록으로 반환하세요"""
+4. 목표가 범위와 stop_loss_hint는 현재 주가와 논리적으로 일치해야 합니다
+5. 반드시 완전한 JSON을 ```json 블록으로 반환하세요"""
 
     try:
         response = llm.invoke([HumanMessage(content=prompt)])
@@ -443,10 +754,25 @@ def synthesizer(state: AnalysisState) -> Dict[str, Any]:
         
         # 목표가 검증 및 수정
         try:
-            current_price = result.get('market_snapshot', {}).get('current_price', 0)
-            target_range = result.get('recommendation', {}).get('target_price_range', '')
+            market = result.get('market_snapshot', {})
+            recommendation = result.get('recommendation', {})
+
+            current_price_raw = market.get('current_price', 0)
+            target_range = recommendation.get('target_price_range', '')
             
-            if current_price > 0 and target_range:
+            current_price = None
+
+            if isinstance(current_price, (int, float)):
+                current_price = float(current_price_raw)
+            elif isinstance(current_price_raw, str):
+                num_match = re.findall(r"[\d\.]+", current_price_raw.replace(",", ""))
+                if num_match:
+                    try:
+                        current_price = float(num_match[0])
+                    except ValueError:
+                        current_price = None
+
+            if current_price and target_range:
                 numbers = re.findall(r'[\d,]+', target_range)
                 if len(numbers) >= 2:
                     target_high = int(numbers[1].replace(',', ''))
@@ -476,6 +802,160 @@ def synthesizer(state: AnalysisState) -> Dict[str, Any]:
             },
             "errors": [f"synthesizer: {str(e)}"]
         }
+    
+def validate_synthesizer(state: AnalysisState) -> Dict[str, Any]:
+    """Synthesizer 최종 보고서 검증 노드"""
+    print("\n✅ [Validator] Synthesizer 최종 보고서 검증 중...")
+
+    result = state.get("final_report") or {}
+    errors: List[str] = []
+
+    # 1) 비어있는지 / 에러 여부
+    if not result:
+        errors.append("final_report is empty")
+
+    if "error" in result:
+        errors.append(f"final_report error: {result['error']}")
+
+    # 2) 필수 최상위 키 체크
+    required_keys = [
+        "meta",
+        "basic_info",
+        "market_snapshot",
+        "financial_summary",
+        "quality_scores",
+        "technical_analysis",
+        "news_and_momentum",
+        "scenarios_1y",
+        "risks",
+        "investment_thesis",
+        "recommendation",
+    ]
+    for key in required_keys:
+        if key not in result:
+            errors.append(f"final_report missing key: {key}")
+
+    # 3) 점수 구조 및 범위 체크
+    q = result.get("quality_scores") or {}
+    if not isinstance(q, dict):
+        errors.append("quality_scores must be an object")
+    else:
+        score_keys = ["financial_score", "technical_score", "news_score", "overall_score"]
+        score_values = {}
+        for k in score_keys:
+            v = q.get(k)
+            if not isinstance(v, (int, float)):
+                errors.append(f"{k} is not numeric: {v}")
+            else:
+                if not (0 <= v <= 100):
+                    errors.append(f"{k} out of range (0~100): {v}")
+                score_values[k] = float(v)
+
+        # overall_score가 나머지 평균과 너무 동떨어지진 않았는지 (경고 수준)
+        if all(key in score_values for key in ["financial_score", "technical_score", "news_score", "overall_score"]):
+            avg = (
+                score_values["financial_score"]
+                + score_values["technical_score"]
+                + score_values["news_score"]
+            ) / 3.0
+            overall = score_values["overall_score"]
+            if abs(overall - avg) > 20:
+                # 이건 구조 에러는 아니니까 "에러"로는 안 치고, 로그만 찍자
+                print(
+                    f"   ⚠️ overall_score({overall})가 개별 점수 평균({avg:.1f})과 많이 다릅니다."
+                )
+
+    # 4) 추천 영역(목표가 / 손절가)와 시장 스냅샷 관계 체크
+    market = result.get("market_snapshot") or {}
+    rec = result.get("recommendation") or {}
+    current_price = market.get("current_price")
+
+    if current_price is None:
+        errors.append("market_snapshot.current_price is missing")
+    else:
+        try:
+            current_price = float(current_price)
+        except Exception:
+            errors.append(f"current_price is not numeric: {current_price}")
+
+    target_range = rec.get("target_price_range")
+    if not target_range:
+        errors.append("recommendation.target_price_range is missing")
+    else:
+        # "88,000 ~ 92,000" 이런 문자열 파싱
+        nums = re.findall(r"[\d,]+", target_range)
+        if len(nums) < 2:
+            errors.append(f"target_price_range must contain at least two numbers: {target_range}")
+        else:
+            low = int(nums[0].replace(",", ""))
+            high = int(nums[1].replace(",", ""))
+
+            if low <= 0 or high <= 0:
+                errors.append(f"target_price_range must be positive: {target_range}")
+            if low >= high:
+                errors.append(
+                    f"target_price_range low({low}) must be less than high({high})"
+                )
+
+            # Synthesizer 안에서 이미 high < current_price면 1.1~1.2배로 수정하니까,
+            # 여기서는 high가 current_price보다 너무 낮은 경우만 에러로 본다.
+            if isinstance(current_price, (int, float)) and high < current_price:
+                errors.append(
+                    f"target_price_range high({high}) < current_price({current_price})"
+                )
+
+    # 5) 시나리오 구조 간단 체크
+    scenarios = result.get("scenarios_1y") or {}
+    if not isinstance(scenarios, dict):
+        errors.append("scenarios_1y must be an object")
+    else:
+        for key in ["bull_case", "base_case", "bear_case"]:
+            if key not in scenarios:
+                errors.append(f"scenarios_1y missing key: {key}")
+
+    is_valid = len(errors) == 0
+
+    # 재시도 카운트 업데이트 (필요하면)
+    retries = dict(state.get("retries", {}))
+    if not is_valid:
+        retries["synthesizer"] = retries.get("synthesizer", 0) + 1
+
+    # 로그 출력
+    if is_valid:
+        print("   ✓ Synthesizer 검증 통과")
+    else:
+        print(
+            f"   ❌ Synthesizer 검증 실패 (retries={retries.get('synthesizer', 0)}):"
+        )
+        for e in errors:
+            print(f"      - {e}")
+
+    return {
+        "retries": retries,
+        "synthesizer_validation": {"is_valid": is_valid},
+        "validation_errors": errors,
+    }
+
+def route_after_validate_synthesizer(state: AnalysisState) -> str:
+    """
+    Synthesizer 검증 후 다음 노드 결정:
+    - "ok"      → END로 종료
+    - "retry"   → synthesizer 다시 호출
+    - "degraded"→ 더 이상 재시도 불가, 그래도 END로 종료
+    """
+    v = state.get("synthesizer_validation") or {}
+    is_valid = v.get("is_valid", False)
+    retries = state.get("retries", {}).get("synthesizer", 0)
+
+    if is_valid:
+        return "ok"
+
+    if retries < MAX_RETRIES:
+        return "retry"
+
+    # 재시도 한계 초과: degraded 상태지만 그냥 끝냄
+    return "degraded"
+
 
 
 # =====================================================
@@ -498,9 +978,18 @@ def build_analysis_graph():
     workflow.add_node("financial_analyst", financial_analyst)
     workflow.add_node("technical_analyst", technical_analyst)
     workflow.add_node("news_analyst", news_analyst)
-    
+
+    # 2.5단계: 검증 노드
+    workflow.add_node("validate_financial", validate_financial)
+    workflow.add_node("validate_technical", validate_technical)
+    workflow.add_node("validate_news", validate_news)
+
+    workflow.add_node("analysis_hub", analysis_hub)
+    workflow.add_node("hub_wait", hub_wait)
+
     # 3단계: 통합 분석
     workflow.add_node("synthesizer", synthesizer)
+    workflow.add_node("validate_synthesizer", validate_synthesizer) 
     
     # 엣지 설정
     # START -> 데이터 수집 (병렬)
@@ -512,19 +1001,61 @@ def build_analysis_graph():
     # 데이터 수집 -> 전문가 분석
     workflow.add_edge("collect_price", "financial_analyst")
     workflow.add_edge("collect_financial", "financial_analyst")
+    workflow.add_edge("financial_analyst", "validate_financial")
+    workflow.add_conditional_edges(
+        "validate_financial",
+        route_after_validate_financial,
+        {
+            "ok": "analysis_hub",       # 정상 → synth로 진행
+            "retry": "financial_analyst",  # 문제 → 재무 분석 다시
+            "degraded": "analysis_hub", # 여러 번 실패 → 그래도 synth로 넘김
+        },
+    )
     
     workflow.add_edge("collect_technical", "technical_analyst")
     workflow.add_edge("collect_price", "technical_analyst")
+    workflow.add_edge("technical_analyst", "validate_technical")
+    workflow.add_conditional_edges(
+        "validate_technical",
+        route_after_validate_technical,
+        {
+            "ok": "analysis_hub",           # 정상 → synth로
+            "retry": "technical_analyst",  # 문제 → 기술 분석 다시
+            "degraded": "analysis_hub",     # 여러 번 실패 → 그래도 synth로
+        },
+    )
     
     workflow.add_edge("collect_news", "news_analyst")
-    
-    # 전문가 분석 -> 통합 분석
-    workflow.add_edge("financial_analyst", "synthesizer")
-    workflow.add_edge("technical_analyst", "synthesizer")
-    workflow.add_edge("news_analyst", "synthesizer")
+    workflow.add_edge("news_analyst", "validate_news")
+    workflow.add_conditional_edges(
+        "validate_news",
+        route_after_validate_news,
+        {
+            "ok": "analysis_hub",       # 정상 → hub로
+            "retry": "news_analyst",    # 문제 → 뉴스 분석 다시
+            "degraded": "analysis_hub", # 여러 번 실패 → 그래도 hub로
+        },
+    )
     
     # 통합 분석 -> END
-    workflow.add_edge("synthesizer", END)
+    workflow.add_conditional_edges(
+        "analysis_hub",
+        route_from_hub,
+        {
+            "go_synth": "synthesizer",
+            "wait": "hub_wait",
+        },
+    )
+    workflow.add_edge("synthesizer", "validate_synthesizer")
+    workflow.add_conditional_edges(
+        "validate_synthesizer",
+        route_after_validate_synthesizer,
+        {
+            "ok": END,             # 정상 → 종료
+            "retry": "synthesizer",# 문제 → Synth 다시 실행
+            "degraded": END,       # 여러 번 실패 → 그래도 결과 리턴하고 종료
+        },
+    )
     
     return workflow.compile()
 
@@ -607,7 +1138,15 @@ def run_langgraph_stock_analysis(
         news_analysis={},
         final_report={},
         messages=[],
-        errors=[]
+        errors=[],
+        retries={"financial": 0, "technical": 0, "news": 0, "synthesizer": 0},
+        financial_validation={},
+        technical_validation={},
+        news_validation={},
+        synthesizer_validation={},
+        ready_flags={"financial": False, "technical": False, "news": False},
+        all_ready=False,
+        validation_errors=[],
     )
     
     # Graph 실행

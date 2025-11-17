@@ -163,7 +163,6 @@ async def analyze_stock_anthropic(request: StockAnalysisRequest):
 async def analyze_stock_langgraph(request: StockAnalysisRequest):
     """LangGraph 기반 종목 분석"""
     try:
-        print('request :', request)
         result = run_langgraph_stock_analysis(
             ticker=request.ticker,
             profile=request.profile,
@@ -171,6 +170,7 @@ async def analyze_stock_langgraph(request: StockAnalysisRequest):
         )
         return JSONResponse(content=result)
     except Exception as e:
+        print(str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
