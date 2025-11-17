@@ -55,6 +55,8 @@ class AnalysisState(TypedDict):
     industry: str
     market_cap_level: str
     profile: Literal["aggressive", "balanced", "conservative"]
+    # LLM 모델 이름 (예: 'gpt-4o', 'gemini-2.5-pro') - run time 선택 가능
+    model_name: str
     
     # 수집된 데이터
     price_data: Dict[str, Any]
@@ -154,7 +156,8 @@ def financial_analyst(state: AnalysisState) -> Dict[str, Any]:
     """재무 분석 전문가"""
     print("\n🏦 [Financial Analyst] 재무 분석 시작...")
     
-    llm = get_chat_model("gpt-4o")
+    # 선택된 모델 이름을 상태에서 읽어옵니다 (run_langgraph_stock_analysis에서 주입됨)
+    llm = get_chat_model(state.get("model_name", "gpt-4o"))
     
     prompt = f"""당신은 재무 분석 전문가입니다.
 종목: {state['company_name']} ({state['ticker']})
@@ -295,7 +298,7 @@ def technical_analyst(state: AnalysisState) -> Dict[str, Any]:
     """기술적 분석 전문가"""
     print("\n📉 [Technical Analyst] 기술적 분석 시작...")
     
-    llm = get_chat_model("gpt-4o")
+    llm = get_chat_model(state.get("model_name", "gpt-4o"))
     
     prompt = f"""당신은 기술적 분석 전문가입니다.
 종목: {state['company_name']} ({state['ticker']})
@@ -445,7 +448,7 @@ def news_analyst(state: AnalysisState) -> Dict[str, Any]:
     """뉴스 분석 전문가"""
     print("\n📰 [News Analyst] 뉴스 분석 시작...")
     
-    llm = get_chat_model("gpt-4o")
+    llm = get_chat_model(state.get("model_name", "gpt-4o"))
     
     prompt = f"""당신은 뉴스 분석 전문가입니다.
 종목: {state['company_name']} ({state['ticker']})
@@ -638,7 +641,7 @@ def synthesizer(state: AnalysisState) -> Dict[str, Any]:
     """통합 분석가 - 모든 전문가 의견을 종합"""
     print("\n🎯 [Synthesizer] 최종 보고서 작성 중...")
     
-    llm = get_chat_model("gpt-4o")
+    llm = get_chat_model(state.get("model_name", "gpt-4o"))
     
     # 각 전문가의 분석 결과
     financial = state.get('financial_analysis', {})
@@ -1129,6 +1132,7 @@ def run_langgraph_stock_analysis(
         industry=industry,
         market_cap_level=market_cap_level,
         profile=profile,
+        model_name=model_name,
         price_data={},
         financial_data={},
         technical_data={},
