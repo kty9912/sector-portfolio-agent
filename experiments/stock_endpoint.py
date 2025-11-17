@@ -23,7 +23,7 @@ from core.llm_clients import AVAILABLE_MODELS
 app = FastAPI(title="AI 단일 종목 분석 시스템")
 
 # 정적 파일 서빙
-app.mount("/static", StaticFiles(directory="experiments/templates"), name="static")
+app.mount("/static", StaticFiles(directory="templates"), name="static")
 
 # ------------------------------
 #  환경 설정
@@ -60,7 +60,7 @@ class StockAnalysisRequest(BaseModel):
 @app.get("/", response_class=FileResponse)
 async def index():
     """메인 페이지"""
-    return FileResponse("experiments/templates/stock_analysis.html")
+    return FileResponse("templates/stock.html")
 
 
 @app.get("/api/models")

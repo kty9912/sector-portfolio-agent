@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 투자 분석 시스템</title>
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+<body>
+    <!-- 네비게이션 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">AI 투자 분석</div>
+            <div class="nav-links">
+                <a href="/">홈</a>
+                <a href="/portfolio">포트폴리오 분석</a>
+                <a href="/stock">종목 분석</a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- 히어로 섹션 -->
+    <section class="hero">
+        <h1>AI 투자 분석 시스템</h1>
+        <p>고도화된 데이터 기반 투자 전략 분석<br>인공지능이 최적의 투자 결정을 지원합니다</p>
+        
+        <div class="hero-stats">
+            <div class="stat-item">
+                <div class="stat-value">21개</div>
+                <div class="stat-label">분석 가능 종목</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">7개</div>
+                <div class="stat-label">산업 섹터</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">AI 기반</div>
+                <div class="stat-label">고품질 분석 엔진</div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 메인 컨테이너 -->
+    <div class="container">
+        <!-- 기능 카드 -->
+        <div class="feature-grid">
+            <div class="feature-card" onclick="location.href='/portfolio'">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">포트폴리오 분석</div>
+                <div class="feature-description">
+                    투자 성향과 목표에 맞는 최적의 포트폴리오를 구성합니다.
+                </div>
+                <ul class="feature-list">
+                    <li>투자 예산 및 기간 맞춤 설정</li>
+                    <li>섹터 및 종목 다중 선택 가능</li>
+                    <li>리스크 프로파일 기반 최적화</li>
+                    <li>예상 수익률 및 리스크 분석</li>
+                    <li>전문가 의견 종합 제공</li>
+                </ul>
+                <button class="btn-feature">포트폴리오 분석 시작 →</button>
+            </div>
+            
+            <div class="feature-card" onclick="location.href='/stock'">
+                <div class="feature-icon">📈</div>
+                <div class="feature-title">종목 분석</div>
+                <div class="feature-description">
+                    개별 종목에 대한 심층 분석과 투자 의견을 제공합니다.
+                </div>
+                <ul class="feature-list">
+                    <li>재무제표 및 실적 분석</li>
+                    <li>기술적 분석 및 차트 패턴</li>
+                    <li>뉴스 및 시장 모멘텀 분석</li>
+                    <li>목표가 및 손절가 제시</li>
+                    <li>투자 시나리오별 예상 수익</li>
+                </ul>
+                <button class="btn-feature">종목 분석 시작 →</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 푸터 -->
+    <footer>
+        <p>© 2025 금융 투자 AI Agent 플랫폼</p>
+        <p style="font-size: 0.9em;">Powered by Advanced AI Technology</p>
+    </footer>
+    
+    <script>
+        // 간단한 애니메이션 효과
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.feature-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    card.style.transition = 'all 0.6s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 150);
+            });
+        });
+    </script>
+</body>
+</html>

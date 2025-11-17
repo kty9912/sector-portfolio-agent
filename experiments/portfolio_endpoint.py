@@ -54,7 +54,7 @@ class PortfolioRequest(BaseModel):
 
 @app.get("/", response_class=FileResponse)
 async def index():
-    return FileResponse("experiments/templates/index.html")
+    return FileResponse("experiments/templates/portfolio.html")
 
 @app.get("/test-multi-agent", response_class=FileResponse)
 async def test_multi_agent():
