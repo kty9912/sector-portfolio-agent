@@ -89,15 +89,6 @@ def load_sector_map() -> Dict[str, str]:
 AVAILABLE_STOCKS = load_available_stocks()
 SECTOR_MAP = load_sector_map()
 
-INDUSTRY_TRENDS = {
-    "AI": "생성형 AI 확산으로 반도체·클라우드 수요 급증. 기업 간 AI 플랫폼 경쟁 심화로 시장 고성장세 유지.",
-    "반도체": "AI 반도체 수요 폭발로 고성능 메모리(HBM) 공급 부족 지속. 파운드리와 팹리스 동반 성장세.",
-    "전력망": "전력망 현대화 및 전력 인프라 교체 수요 확대. 스마트그리드 및 배전 자동화 관련주 수혜 예상.",
-    "원자력": "탄소중립 기조 속 원전 재평가. 중동·동유럽 프로젝트 수주 본격화로 장기 성장 모멘텀 확보.",
-    "조선": "친환경·LNG선 중심의 수주 호황 지속. 해운 운임 안정화와 글로벌 교체 수요로 업황 긍정적.",
-    "방산": "지정학적 긴장 고조로 국방예산 확대. 유럽·중동 중심의 수출 증가세로 중장기 성장 기대.",
-    "바이오": "글로벌 바이오시밀러 시장 확대 지속. 미국 FDA 승인 증가와 신약개발 투자 회복세 뚜렷.",
-}
 
 
 # =====================================================
@@ -222,8 +213,7 @@ def get_company_info(ticker: str) -> Dict[str, Any]:
     return {
         "ticker": ticker,
         "name": company.get("name_kr"),
-        "sector": sector_kr,
-        "industry_trend": INDUSTRY_TRENDS.get(sector_kr, "정보 없음")
+        "sector": sector_kr
     }
 
 
@@ -534,7 +524,8 @@ def news_agent_node(state: MultiAgentState) -> MultiAgentState:
     """
     뉴스 분석 전문가 에이전트
     - 산업 동향 분석
-    - 종목별 뉴스 감성 분석 (향후 Qdrant 통합 예정)
+    - 종목별 뉴스 감성 분석 
+    - Qdrant에서 뉴스 검색
     - 각 종목에 대한 뉴스 점수 (0-100) 산출
     """
     print("\n" + "="*60)
@@ -542,50 +533,117 @@ def news_agent_node(state: MultiAgentState) -> MultiAgentState:
     print("="*60)
     
     # ⭐ 상태에서 선택된 모델 사용
-    model_name = state.get("model_name", "gpt-4o-mini")
+    model_name = state.get("model_name", "gpt-4o")
     llm = get_chat_model(model_name)
     print(f"  📌 사용 모델: {model_name}")
     
     company_infos = state.get("company_infos", {})
     stock_prices = state.get("stock_prices", {})
     
-    # 섹터별 동향 정보 수집
-    sector_trends = {}
-    company_data = {}
-    for ticker, info in company_infos.items():
-        sector = info.get("sector")
-        if sector and sector not in sector_trends:
-            sector_trends[sector] = INDUSTRY_TRENDS.get(sector, "정보 없음")
-        
-        # 주가 정보 추가
-        company_data[ticker] = {
-            "name": info["name"],
-            "sector": info["sector"],
-            "current_price": stock_prices.get(ticker, {}).get("current_price"),
-            "period_return": stock_prices.get(ticker, {}).get("period_return_pct")
-        }
+    # agents/tools.py의 뉴스 검색 함수 임포트
+    from agents.tools import search_sector_news_qdrant, search_stock_news
     
-    # LLM에게 뉴스 분석 요청
+    company_infos = state.get("company_infos", {})
+    stock_prices = state.get("stock_prices", {})
+    company_infos = state.get("company_infos", {})
+    stock_prices = state.get("stock_prices", {})
+    
+    # ⭐ 섹터 추출
+    investment_targets = state["investment_targets"]
+    if hasattr(investment_targets, 'sectors'):
+        sectors = investment_targets.sectors
+    else:
+        sectors = investment_targets.get("sectors", [])
+    
+    # 섹터별 뉴스 수집
+    sector_news = {}
+    sector_trends = {}
+    for sector in sectors:
+        news_result = search_sector_news_qdrant.invoke({"sector_name": sector})
+        sector_news[sector] = news_result
+        
+        # LLM에 산업 동향 요약 요청
+        prompt = f"""
+        '{sector}' 섹터 관련 최신 뉴스 내용:
+        {news_result.get('news', [])}
+
+        위 뉴스를 요약해서 해당 섹터의 산업 동향을 3-5문장으로 작성해줘.
+        """
+        llm = get_chat_model(state['model_name'])
+        response = llm.invoke([HumanMessage(content=prompt)])
+        sector_trends[sector] = response.content
+    
+    # 종목별 뉴스 수집 (상위 10개만)
+    stock_news = {}
+    for idx, ticker in enumerate(list(company_infos.keys())[:10], 1):
+        company_name = company_infos[ticker].get("name")
+        print(f"  🔍 [{idx}/10] {company_name} ({ticker}) 뉴스 검색")
+        
+        result = search_stock_news.invoke({
+            "ticker": ticker,
+            "company_name": company_name,
+            "limit": 3
+        })
+        
+        if "error" not in result:
+            stock_news[ticker] = result
+    
+    # 종목별 뉴스 점수 계산
+    ticker_scores = {}
+    for ticker, news in stock_news.items():
+        if "news" not in news or not news["news"]:
+            ticker_scores[ticker] = {
+                "news_score": 50,  # 중립 점수
+                "sentiment": "neutral",
+                "comment": "뉴스 데이터 부족"
+            }
+            continue
+        
+        # 감성 점수 평균 계산
+        news_items = news["news"]
+        sentiments = [item.get("sentiment", "neutral") for item in news_items]
+        sentiment_scores = [item.get("sentiment_score", 0) for item in news_items]
+        
+        # 점수 계산 (0~100 스케일)
+        avg_sentiment_score = sum(sentiment_scores) / len(sentiment_scores)
+        news_score = (avg_sentiment_score + 1) * 50  # -1~1 → 0~100
+        
+        # 주요 감성 판단
+        positive_count = sentiments.count("positive")
+        negative_count = sentiments.count("negative")
+        
+        if positive_count > negative_count:
+            overall_sentiment = "positive"
+        elif negative_count > positive_count:
+            overall_sentiment = "negative"
+        else:
+            overall_sentiment = "neutral"
+        
+        ticker_scores[ticker] = {
+            "news_score": round(news_score, 1),
+            "sentiment": overall_sentiment,
+            "positive_count": positive_count,
+            "negative_count": negative_count,
+            "comment": f"긍정 {positive_count}건, 부정 {negative_count}건"
+        }
+        
+        print(f"    ✓ {ticker}: 뉴스 점수 {news_score:.1f} ({overall_sentiment})")
+    
+    # LLM에게 최종 분석 요청
     prompt = f"""당신은 **뉴스 및 산업 동향 분석 전문가**입니다.
 
 **투자 조건:**
 - 투자 성향: {state['risk_profile']}
 - 투자 기간: {state['investment_period']}
 
-**분석할 종목 및 섹터 동향:**
-{json.dumps({
-    "companies": company_data,
-    "sector_trends": sector_trends
-}, ensure_ascii=False, indent=2)}
+**섹터별 뉴스 분석:**
+{json.dumps(sector_news, ensure_ascii=False, indent=2)}
+
+**종목별 뉴스 점수 (Qdrant 기반):**
+{json.dumps(ticker_scores, ensure_ascii=False, indent=2)}
 
 **임무:**
-각 종목에 대해 산업 동향과 뉴스 전망을 분석하고, 0-100점의 **뉴스 점수**를 산출하세요.
-
-**평가 기준:**
-1. 산업 성장성: 해당 섹터의 장기 성장 전망 (가중치 40%)
-2. 정책 지원: 정부 정책 및 규제 환경 (가중치 20%)
-3. 시장 수요: 제품/서비스 수요 추세 (가중치 25%)
-4. 경쟁 환경: 시장 점유율 및 경쟁 강도 (가중치 15%)
+위 데이터를 바탕으로 종합적인 뉴스 분석을 제공하세요.
 
 **출력 형식 (반드시 JSON):**
 ```json
@@ -626,6 +684,14 @@ def news_agent_node(state: MultiAgentState) -> MultiAgentState:
             json_str = response_text
         
         news_analysis = json.loads(json_str)
+        
+        # Qdrant 점수를 LLM 결과에 병합
+        if "ticker_scores" in news_analysis:
+            for ticker, qdrant_score in ticker_scores.items():
+                if ticker in news_analysis["ticker_scores"]:
+                    news_analysis["ticker_scores"][ticker]["news_score"] = qdrant_score["news_score"]
+                    news_analysis["ticker_scores"][ticker]["sentiment"] = qdrant_score["sentiment"]
+
         print(f"\n✅ 뉴스 분석 완료")
         print(f"  - 분석 종목: {len(news_analysis.get('ticker_scores', {}))}개")
         print(f"  - 섹터 전망: {news_analysis.get('sector_outlook', {})}")
@@ -639,7 +705,7 @@ def news_agent_node(state: MultiAgentState) -> MultiAgentState:
         }
     
     # ⚠️ 병렬 실행 시 충돌 방지: 자신이 업데이트한 필드만 반환
-    print(f"\n📝 [뉴스 전문가] 분석 완료, summary 저장됨")
+    print(f"\n📝 [뉴스 전문가] 분석 완료, {len(ticker_scores)}개 종목 분석됨, summary 저장됨")
     
     return {
         "news_analysis": news_analysis
@@ -718,7 +784,7 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
     print("="*60)
     
     # ⭐ 상태에서 선택된 모델 사용 (Supervisor도 동일 모델 사용)
-    model_name = state.get("model_name", "gpt-4o-mini")
+    model_name = state.get("model_name", "solar-pro2")
     llm = get_chat_model(model_name)
     print(f"  📌 사용 모델: {model_name}")
     
@@ -839,6 +905,9 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
 
     response = llm.invoke([HumanMessage(content=prompt)])
     response_text = response.content
+
+    print("Supervisor raw LLM output:\n", response_text)
+
     
     # JSON 파싱
     try:
@@ -853,24 +922,35 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
         # JSON 정리
         json_str_fixed = json_str.replace("'", '"')
         json_str_fixed = re.sub(r',(\s*[}\]])', r'\1', json_str_fixed)
+        result = json.loads(json_str)  # JSON 파싱 시도
+
+        # result = json.loads(json_str_fixed)
         
-        result = json.loads(json_str_fixed)
+        # state["ai_summary"] = result.get("ai_summary", "")
+        # state["portfolio_allocation"] = result.get("portfolio_allocation", [])
+        # state["performance_metrics"] = result.get("performance_metrics", {})
+        # state["chart_data"] = result.get("chart_data", {})
         
-        state["ai_summary"] = result.get("ai_summary", "")
-        state["portfolio_allocation"] = result.get("portfolio_allocation", [])
-        state["performance_metrics"] = result.get("performance_metrics", {})
-        state["chart_data"] = result.get("chart_data", {})
+        # print(f"\n✅ Supervisor 분석 완료")
+        # print(f"  - 포트폴리오 생성: {len(state['portfolio_allocation'])}개 종목")
+        # print(f"  - 예상 수익률: {state['performance_metrics'].get('expected_return', 0)}%")
         
-        print(f"\n✅ Supervisor 분석 완료")
-        print(f"  - 포트폴리오 생성: {len(state['portfolio_allocation'])}개 종목")
-        print(f"  - 예상 수익률: {state['performance_metrics'].get('expected_return', 0)}%")
-        
-    except json.JSONDecodeError as e:
-        print(f"⚠️ JSON 파싱 오류: {e}")
-        state["ai_summary"] = "최종 포트폴리오 생성 실패"
-        state["portfolio_allocation"] = []
-        state["performance_metrics"] = {}
-        state["chart_data"] = {}
+    except Exception as e:
+        print(f"Supervisor JSON 파싱 오류: {e}")
+        print("LLM 응답 텍스트:\n", response_text)
+        # 기본 결과로 fallback 처리
+        result = {
+            "ai_summary": "최종 포트폴리오 생성 실패",
+            "portfolio_allocation": [],
+            "performance_metrics": {},
+            "chart_data": {}
+        }
+    # except json.JSONDecodeError as e:
+    #     print(f"⚠️ JSON 파싱 오류: {e}")
+    #     state["ai_summary"] = "최종 포트폴리오 생성 실패"
+    #     state["portfolio_allocation"] = []
+    #     state["performance_metrics"] = {}
+    #     state["chart_data"] = {}
     
     # ⭐ discussion_history 설정 (3명의 전문가 의견을 한 번에 수집)
     discussion_history = []
