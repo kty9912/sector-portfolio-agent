@@ -523,94 +523,198 @@ def technical_agent_node(state: MultiAgentState) -> MultiAgentState:
 def news_agent_node(state: MultiAgentState) -> MultiAgentState:
     """
     뉴스 분석 전문가 에이전트
+    - Qdrant (과거 심층 뉴스) + Tavily (최신 속보) 통합
     - 산업 동향 분석
-    - 종목별 뉴스 감성 분석 
-    - Qdrant에서 뉴스 검색
-    - 각 종목에 대한 뉴스 점수 (0-100) 산출
+    - 종목별 뉴스 감성 분석 (LLM 기반)
     """
     print("\n" + "="*60)
     print("📰 [뉴스 분석 전문가] 분석 시작")
     print("="*60)
     
     # ⭐ 상태에서 선택된 모델 사용
-    model_name = state.get("model_name", "gpt-4o")
+    model_name = state.get("model_name", "solar-pro2")
     llm = get_chat_model(model_name)
     print(f"  📌 사용 모델: {model_name}")
     
     company_infos = state.get("company_infos", {})
-    stock_prices = state.get("stock_prices", {})
     
     # agents/tools.py의 뉴스 검색 함수 임포트
-    from agents.tools import search_sector_news_qdrant, search_stock_news
+    from agents.tools import (
+        search_sector_news_qdrant, 
+        search_stock_news,
+        search_realtime_news_tavily
+    )
     
-    company_infos = state.get("company_infos", {})
-    stock_prices = state.get("stock_prices", {})
-    company_infos = state.get("company_infos", {})
-    stock_prices = state.get("stock_prices", {})
-    
-    # ⭐ 섹터 추출
+    # 섹터 추출
     investment_targets = state["investment_targets"]
     if hasattr(investment_targets, 'sectors'):
         sectors = investment_targets.sectors
     else:
         sectors = investment_targets.get("sectors", [])
     
-    # 섹터별 뉴스 수집
+    # ============================================
+    # 1단계: 섹터별 뉴스 수집 (Qdrant + Tavily)
+    # ============================================
     sector_news = {}
     sector_trends = {}
-    for sector in sectors:
-        news_result = search_sector_news_qdrant.invoke({"sector_name": sector})
-        sector_news[sector] = news_result
-        
-        # LLM에 산업 동향 요약 요청
-        prompt = f"""
-        '{sector}' 섹터 관련 최신 뉴스 내용:
-        {news_result.get('news', [])}
-
-        위 뉴스를 요약해서 해당 섹터의 산업 동향을 3-5문장으로 작성해줘.
-        """
-        llm = get_chat_model(state['model_name'])
-        response = llm.invoke([HumanMessage(content=prompt)])
-        sector_trends[sector] = response.content
     
-    # 종목별 뉴스 수집 (상위 10개만)
+    for sector in sectors:
+        print(f"  🔍 섹터 뉴스 수집: {sector}")
+        
+        # Qdrant (과거/심층 뉴스)
+        qdrant_result = search_sector_news_qdrant.invoke({"sector_name": sector})
+        
+        # Tavily (최신 속보, 최근 한달)
+        tavily_result = search_realtime_news_tavily.invoke({
+            "query": f"{sector} 섹터 최신 뉴스 산업 동향",
+        })
+        
+        # 두 결과 병합
+        sector_news[sector] = {
+            "qdrant": qdrant_result,
+            "tavily": tavily_result
+        }
+        
+        # LLM에게 산업 동향 요약 요청 (Qdrant + Tavily 모두 활용)
+        trend_prompt = f"""
+        '{sector}' 섹터 관련 뉴스 데이터:
+        
+        **과거 심층 뉴스 (Qdrant):**
+        {json.dumps(qdrant_result.get('news', [])[:8], ensure_ascii=False, indent=2)}
+        
+        **최신 속보 (Tavily):**
+        {tavily_result[:5] if isinstance(tavily_result, list) else tavily_result}
+        
+        위 두 가지 뉴스 소스를 종합하여 해당 섹터의 **산업 동향**을 3-5문장으로 작성해줘.
+        - 과거 트렌드와 최신 이슈를 모두 반영
+        - 투자자 관점에서 중요한 포인트 강조
+        """
+        trend_response = llm.invoke([HumanMessage(content=trend_prompt)])
+        sector_trends[sector] = trend_response.content
+        
+        qdrant_count = len(qdrant_result.get('news', []))
+        tavily_count = len(tavily_result) if isinstance(tavily_result, list) else 0
+        print(f"    ✓ {sector}: Qdrant {qdrant_count}건 + Tavily {tavily_count}건")
+    
+    # ============================================
+    # 2단계: 종목별 뉴스 수집 (상위 10개)
+    # ============================================
     stock_news = {}
+    
     for idx, ticker in enumerate(list(company_infos.keys())[:10], 1):
         company_name = company_infos[ticker].get("name")
         print(f"  🔍 [{idx}/10] {company_name} ({ticker}) 뉴스 검색")
         
-        result = search_stock_news.invoke({
+        # Qdrant (과거 뉴스)
+        qdrant_stock = search_stock_news.invoke({
             "ticker": ticker,
             "company_name": company_name,
-            "limit": 3
+            "limit": 5
         })
         
-        if "error" not in result:
-            stock_news[ticker] = result
+        # Tavily (최신 속보) 추가
+        tavily_stock = search_realtime_news_tavily.invoke({
+            "query": f"{company_name} 최신 뉴스"
+        })
+        
+        # ✅ 두 결과 병합
+        if "error" not in qdrant_stock or (isinstance(tavily_stock, list) and tavily_stock):
+            stock_news[ticker] = {
+                "qdrant": qdrant_stock,
+                "tavily": tavily_stock,  
+                "company_name": company_name
+            }
     
-    # 종목별 뉴스 점수 계산
+    # ============================================
+    # 3단계: 종목별 뉴스 점수 계산 (Qdrant + Tavily 통합)
+    # ============================================
     ticker_scores = {}
-    for ticker, news in stock_news.items():
-        if "news" not in news or not news["news"]:
+    
+    for ticker, news_data in stock_news.items():
+        qdrant_news = news_data.get("qdrant", {}).get("news", [])
+        tavily_news = news_data.get("tavily", []) if isinstance(news_data.get("tavily"), list) else []
+        company_name = news_data.get("company_name", ticker)
+        
+        # 뉴스가 없으면 중립 점수
+        if not qdrant_news and not tavily_news:
             ticker_scores[ticker] = {
-                "news_score": 50,  # 중립 점수
+                "news_score": 50,
                 "sentiment": "neutral",
+                "positive_count": 0,
+                "negative_count": 0,
+                "qdrant_news_count": 0,
+                "tavily_news_count": 0,
                 "comment": "뉴스 데이터 부족"
             }
             continue
         
-        # 감성 점수 평균 계산
-        news_items = news["news"]
-        sentiments = [item.get("sentiment", "neutral") for item in news_items]
-        sentiment_scores = [item.get("sentiment_score", 0) for item in news_items]
+        # ⭐ Qdrant 감성 점수 사용 (이미 분석됨)
+        qdrant_sentiments = [item.get("sentiment", "neutral") for item in qdrant_news]
+        qdrant_scores = [item.get("sentiment_score", 0) for item in qdrant_news]
         
-        # 점수 계산 (0~100 스케일)
-        avg_sentiment_score = sum(sentiment_scores) / len(sentiment_scores)
-        news_score = (avg_sentiment_score + 1) * 50  # -1~1 → 0~100
+        # ⭐ Tavily는 LLM으로 감성 분석 (텍스트가 많으므로)
+        tavily_sentiments = []
+        tavily_scores = []
+        
+        if tavily_news:
+            tavily_prompt = f"""
+            다음은 '{company_name}'의 최신 뉴스입니다:
+            
+            {json.dumps(tavily_news[:5], ensure_ascii=False, indent=2)}
+            
+            각 뉴스의 감성을 분석하여 다음 형식으로 답변하세요:
+            
+            
+            {{
+              "news_sentiments": [
+                {{"index": 0, "sentiment": "positive/negative/neutral", "score": 0.8}},
+                {{"index": 1, "sentiment": "neutral", "score": 0.0}}
+              ]
+            }}
+        
+            
+            **중요:** 
+            - JSON 형식으로만 답변하세요.
+            - sentiment는 "positive", "negative", "neutral" 중 하나
+            - score는 -1.0 ~ 1.0 사이의 값
+            """
+        
+            try:
+                    tavily_sentiment_response = llm.invoke([HumanMessage(content=tavily_prompt)])
+                    tavily_sentiment_text = tavily_sentiment_response.content
+                    
+                    json_start = tavily_sentiment_text.find("{")
+                    json_end = tavily_sentiment_text.rfind("}") + 1
+                    
+                    if json_start != -1 and json_end > json_start:
+                        json_str = tavily_sentiment_text[json_start:json_end].strip()
+                    else:
+                        json_str = tavily_sentiment_text.strip()
+                    
+                    tavily_sentiment_data = json.loads(json_str)
+                    
+                    for item in tavily_sentiment_data.get("news_sentiments", []):
+                        tavily_sentiments.append(item.get("sentiment", "neutral"))
+                        tavily_scores.append(item.get("score", 0))
+                        
+            except Exception as e:
+                print(f"    ⚠️ {ticker}: Tavily 감성 분석 실패 ({e}), 중립으로 처리")
+                tavily_sentiments = ["neutral"] * len(tavily_news)
+                tavily_scores = [0] * len(tavily_news)
+        
+        # ⭐ Qdrant + Tavily 감성 점수 통합
+        all_sentiments = qdrant_sentiments + tavily_sentiments
+        all_scores = qdrant_scores + tavily_scores
+        
+        if all_scores:
+            avg_sentiment_score = sum(all_scores) / len(all_scores)
+            news_score = (avg_sentiment_score + 1) * 50  # -1~1 → 0~100
+        else:
+            news_score = 50
         
         # 주요 감성 판단
-        positive_count = sentiments.count("positive")
-        negative_count = sentiments.count("negative")
+        positive_count = all_sentiments.count("positive")
+        negative_count = all_sentiments.count("negative")
         
         if positive_count > negative_count:
             overall_sentiment = "positive"
@@ -624,92 +728,98 @@ def news_agent_node(state: MultiAgentState) -> MultiAgentState:
             "sentiment": overall_sentiment,
             "positive_count": positive_count,
             "negative_count": negative_count,
-            "comment": f"긍정 {positive_count}건, 부정 {negative_count}건"
+            "qdrant_news_count": len(qdrant_news),
+            "tavily_news_count": len(tavily_news),
+            "comment": f"긍정 {positive_count}건, 부정 {negative_count}건 (Qdrant: {len(qdrant_news)}, Tavily: {len(tavily_news)})"
         }
         
-        print(f"    ✓ {ticker}: 뉴스 점수 {news_score:.1f} ({overall_sentiment})")
+        print(f"    ✓ {ticker}: 뉴스 점수 {news_score:.1f} ({overall_sentiment}) - Qdrant {len(qdrant_news)}건 + Tavily {len(tavily_news)}건")
     
-    # LLM에게 최종 분석 요청
-    prompt = f"""당신은 **뉴스 및 산업 동향 분석 전문가**입니다.
+    # ============================================
+    # 4단계: LLM에게 최종 분석 요청
+    # ============================================
+    final_prompt = f"""당신은 **뉴스 및 산업 동향 분석 전문가**입니다.
 
 **투자 조건:**
 - 투자 성향: {state['risk_profile']}
 - 투자 기간: {state['investment_period']}
 
-**섹터별 뉴스 분석:**
+**섹터별 산업 동향 (Qdrant + Tavily 통합 분석):**
+{json.dumps(sector_trends, ensure_ascii=False, indent=2)}
+
+**섹터별 원본 뉴스 데이터:**
 {json.dumps(sector_news, ensure_ascii=False, indent=2)}
 
-**종목별 뉴스 점수 (Qdrant 기반):**
+**종목별 뉴스 점수 (Qdrant + Tavily 기반):**
 {json.dumps(ticker_scores, ensure_ascii=False, indent=2)}
 
-**임무:**
-위 데이터를 바탕으로 종합적인 뉴스 분석을 제공하세요.
-
 **출력 형식 (반드시 JSON):**
-```json
+
 {{
-  "analysis_summary": "뉴스 분석 종합 의견 (2-3줄)",
-  "ticker_scores": {{
-    "005930": {{
-      "news_score": 88,
-      "industry_growth_score": 90,
-      "policy_support_score": 85,
-      "market_demand_score": 90,
-      "competition_score": 80,
-      "sentiment": "positive",
-      "comment": "AI 반도체 수요 급증으로 장기 성장 전망 밝음"
-    }},
-    ...
-  }},
-  "sector_outlook": {{
-    "반도체": "매우 긍정적",
-    "바이오": "긍정적"
-  }}
+"analysis_summary": "뉴스 분석 종합 의견 (2-3줄) - Qdrant 과거 데이터와 Tavily 최신 속보를 모두 반영",
+"ticker_scores": {{
+"005930.KS": {{
+"news_score": 88,
+"sentiment": "positive",
+"comment": "AI 반도체 관련 긍정적 뉴스 다수, Tavily 최신 속보에서 수주 호재 확인"
 }}
-```
+}},
+"sector_outlook": {{
+"반도체": "매우 긍정적",
+"바이오": "긍정적"
+}}
+}}
 
-**중요:** 반드시 JSON 형식으로만 답변하세요."""
+**중요:** 
+1. 반드시 JSON 형식으로만 답변
+2. 모든 문자열은 큰따옴표(")만 사용
+3. 백틱(`)이나 작은따옴표(')는 사용 금지
+4. 섹터별 산업 동향을 반영하여 분석
+5. Qdrant (과거 심층)와 Tavily (최신 속보) 모두 고려"""
 
-    response = llm.invoke([HumanMessage(content=prompt)])
-    response_text = response.content
+    final_response = llm.invoke([HumanMessage(content=final_prompt)])
+    response_text = final_response.content
     
     # JSON 파싱
     try:
-        json_start = response_text.find("```json")
-        json_end = response_text.find("```", json_start + 7)
+        json_start = response_text.find("{")
+        json_end = response_text.rfind("}") + 1
         
-        if json_start != -1 and json_end != -1:
-            json_str = response_text[json_start+7:json_end].strip()
+        if json_start != -1 and json_end > json_start:
+            json_str = response_text[json_start:json_end].strip()
         else:
-            json_str = response_text
+            json_str = response_text.strip()
         
         news_analysis = json.loads(json_str)
         
-        # Qdrant 점수를 LLM 결과에 병합
+        # ⭐ Qdrant + Tavily 통합 점수를 LLM 결과에 병합
         if "ticker_scores" in news_analysis:
-            for ticker, qdrant_score in ticker_scores.items():
+            for ticker, calculated_score in ticker_scores.items():
                 if ticker in news_analysis["ticker_scores"]:
-                    news_analysis["ticker_scores"][ticker]["news_score"] = qdrant_score["news_score"]
-                    news_analysis["ticker_scores"][ticker]["sentiment"] = qdrant_score["sentiment"]
+                    news_analysis["ticker_scores"][ticker].update(calculated_score)
 
         print(f"\n✅ 뉴스 분석 완료")
         print(f"  - 분석 종목: {len(news_analysis.get('ticker_scores', {}))}개")
         print(f"  - 섹터 전망: {news_analysis.get('sector_outlook', {})}")
+        print(f"  - 산업 동향 반영: {len(sector_trends)}개 섹터")
         
-    except json.JSONDecodeError as e:
+    except Exception as e:
         print(f"⚠️ JSON 파싱 오류: {e}")
         news_analysis = {
-            "analysis_summary": "뉴스 분석 파싱 실패",
-            "ticker_scores": {},
-            "sector_outlook": {}
+            "analysis_summary": f"뉴스 분석 완료. {len(ticker_scores)}개 종목 분석됨",
+            "ticker_scores": ticker_scores,
+            "sector_outlook": {},
+            "sector_trends": sector_trends  # 산업 동향 포함
         }
     
-    # ⚠️ 병렬 실행 시 충돌 방지: 자신이 업데이트한 필드만 반환
-    print(f"\n📝 [뉴스 전문가] 분석 완료, {len(ticker_scores)}개 종목 분석됨, summary 저장됨")
-    
+    print(f"\n📝 [뉴스 전문가] 분석 완료")
+
     return {
         "news_analysis": news_analysis
-        # ⭐ discussion_history는 supervisor에서 한 번에 수집
+        # {
+        #     "ticker_scores": ticker_scores,
+        #     "sector_news": sector_news
+        # }
     }
 
 
@@ -804,9 +914,9 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
     
     # ⭐ 디버깅: supervisor 실행 횟수 추적
     current_history = state.get("discussion_history", [])
-    print(f"\n� [Supervisor 디버깅] discussion_history 개수: {len(current_history)}")
+    print(f"\n\ [Supervisor 디버깅] discussion_history 개수: {len(current_history)}")
     
-    print("\n�📊 전문가 의견 요약:")
+    print("\n📊 전문가 의견 요약:")
     for idx, msg in enumerate(current_history, 1):
         print(f"  [{idx}] {msg[:80]}...")
     
@@ -852,12 +962,20 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
    - months: [1, 3, 6, 12] (고정)
    - portfolio: 포트폴리오 예상 수익률
    - benchmark: 벤치마크(KOSPI) 예상 수익률
+
+**⚠️ JSON 형식 필수 규칙:**
+1. 모든 문자열은 큰따옴표(")만 사용하세요
+2. 백틱(`)이나 작은따옴표(')는 절대 사용하지 마세요
+3. JSON 블록 외에 다른 텍스트는 포함하지 마세요
+4. 마지막 항목 뒤 쉼표는 제거하세요
+
+**출력 예시:**
 - 예시:
   ```json
   {{
-  "ai_summary": `  삼성전자(45%), NAVER(30%), 한화오션(25%)으로 구성된 포트폴리오로, IT·조선 등 산업을 고르게 분산해 경기순환 리스크를 완화한 중립형 전략입니다.
+  "ai_summary": "  삼성전자(45%), NAVER(30%), 한화오션(25%)으로 구성된 포트폴리오로, IT·조선 등 산업을 고르게 분산해 경기순환 리스크를 완화한 중립형 전략입니다.
   투자 전략은 1년을 기준으로 단계적으로 운영됩니다. 1~3개월 차에는 실적 발표 및 AI 반도체 수요 변화를 모니터링하고, 6개월 시점에는 일정 수익 실현과 함께 NAVER 비중 확대를 검토합니다. 
-  12개월 이후에는 경기 회복 국면에 맞춰 삼성전자 중심으로 리밸런싱을 계획하고 있습니다.  종합 평가 결과 82점으로, AI 산업 성장에 따른 장기적 수익성을 노리는 중립형 투자자에게 적합한 포트폴리오로 판단됩니다.`,
+  12개월 이후에는 경기 회복 국면에 맞춰 삼성전자 중심으로 리밸런싱을 계획하고 있습니다.  종합 평가 결과 82점으로, AI 산업 성장에 따른 장기적 수익성을 노리는 중립형 투자자에게 적합한 포트폴리오로 판단됩니다.",
     "portfolio_allocation": [
       {{
         "ticker": "068270.KS",
@@ -906,7 +1024,11 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
     response = llm.invoke([HumanMessage(content=prompt)])
     response_text = response.content
 
-    print("Supervisor raw LLM output:\n", response_text)
+    print("\n" + "="*60)
+    print("🔍 [Supervisor] LLM Raw Output:")
+    print("="*60)
+    print(response_text[:500] + "..." if len(response_text) > 500 else response_text)
+    print("="*60 + "\n")
 
     
     # JSON 파싱
@@ -917,42 +1039,45 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
         if json_start != -1 and json_end != -1:
             json_str = response_text[json_start+7:json_end].strip()
         else:
-            json_str = response_text
+            json_str = response_text.strip()
         
         # JSON 정리
         json_str_fixed = json_str.replace("'", '"')
+        json_str_fixed = json_str_fixed.replace("`", '"') 
         json_str_fixed = re.sub(r',(\s*[}\]])', r'\1', json_str_fixed)
-        result = json.loads(json_str)  # JSON 파싱 시도
-
-        # result = json.loads(json_str_fixed)
+        result = json.loads(json_str_fixed)  # JSON 파싱 시도
         
-        # state["ai_summary"] = result.get("ai_summary", "")
-        # state["portfolio_allocation"] = result.get("portfolio_allocation", [])
-        # state["performance_metrics"] = result.get("performance_metrics", {})
-        # state["chart_data"] = result.get("chart_data", {})
+        state["ai_summary"] = result.get("ai_summary", "")
+        state["portfolio_allocation"] = result.get("portfolio_allocation", [])
+        state["performance_metrics"] = result.get("performance_metrics", {})
+        state["chart_data"] = result.get("chart_data", {})
         
-        # print(f"\n✅ Supervisor 분석 완료")
-        # print(f"  - 포트폴리오 생성: {len(state['portfolio_allocation'])}개 종목")
-        # print(f"  - 예상 수익률: {state['performance_metrics'].get('expected_return', 0)}%")
+        print(f"\n✅ Supervisor 분석 완료")
+        print(f"  - 포트폴리오 생성: {len(state['portfolio_allocation'])}개 종목")
+        print(f"  - 예상 수익률: {state['performance_metrics'].get('expected_return', 0)}%")
         
-    except Exception as e:
-        print(f"Supervisor JSON 파싱 오류: {e}")
-        print("LLM 응답 텍스트:\n", response_text)
-        # 기본 결과로 fallback 처리
-        result = {
-            "ai_summary": "최종 포트폴리오 생성 실패",
-            "portfolio_allocation": [],
-            "performance_metrics": {},
-            "chart_data": {}
-        }
-    # except json.JSONDecodeError as e:
-    #     print(f"⚠️ JSON 파싱 오류: {e}")
-    #     state["ai_summary"] = "최종 포트폴리오 생성 실패"
-    #     state["portfolio_allocation"] = []
-    #     state["performance_metrics"] = {}
-    #     state["chart_data"] = {}
+    except json.JSONDecodeError as e:
+        print(f"\n❌ JSON 파싱 오류: {e}")
+        print(f"파싱 시도한 문자열:\n{json_str_fixed[:200]}...")
+        
+        # Fallback 처리
+        state["ai_summary"] = "최종 포트폴리오 생성 실패 (JSON 파싱 오류)"
+        state["portfolio_allocation"] = []
+        state["performance_metrics"] = {}
+        state["chart_data"] = {}
     
-    # ⭐ discussion_history 설정 (3명의 전문가 의견을 한 번에 수집)
+    except Exception as e:
+        print(f"\n❌ 예상치 못한 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Fallback 처리
+        state["ai_summary"] = f"최종 포트폴리오 생성 실패: {str(e)}"
+        state["portfolio_allocation"] = []
+        state["performance_metrics"] = {}
+        state["chart_data"] = {}
+    
+    # ⭐ discussion_history 설정
     discussion_history = []
     
     if financial.get('analysis_summary'):
