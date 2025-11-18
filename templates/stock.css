@@ -4,6 +4,23 @@
     box-sizing: border-box;
 }
 
+:root {
+    /* Charcoal / Platinum / Mint theme (same as other templates) */
+    --brand-main: #37474f; /* charcoal */
+    --brand-point: #26a69a; /* mint */
+    --brand-grad: linear-gradient(135deg, var(--brand-main) 0%, var(--brand-point) 100%);
+    --brand-grad-ud: linear-gradient(180deg, var(--brand-main) 0%, var(--brand-point) 100%);
+    --brand-main-rgb: 55,71,79;
+    --brand-point-rgb: 38,166,154;
+
+    --bg: #f6f7f8;
+    --surface: #ffffff;
+    --surface-grad: linear-gradient(135deg, #ffffff 0%, #f6f7f8 100%);
+    --text: #263238;
+    --muted: #666666;
+    --success: #2e7d32;
+}
+
 /* 네비게이션 */
 .navbar {
     background: rgba(255, 255, 255, 0.95);
@@ -27,7 +44,7 @@
 .logo {
     font-size: 1.5em;
     font-weight: 700;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--brand-main);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -43,18 +60,18 @@
 .nav-links a {
     color: #333;
     text-decoration: none;
-    font-weight: 500;
+    font-weight: 700;
     transition: color 0.3s;
-    font-size: 0.95em;
+    font-size: 1.1em;
 }
 
 .nav-links a:hover {
-    color: #667eea;
+    color: var(--brand-point);
 }
 
 body {
-    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+    background: var(--brand-grad);
     min-height: 100vh;
 }
 
@@ -83,10 +100,10 @@ body {
 }
 
 .panel {
-    background: white;
+    background: var(--surface);
     border-radius: 16px;
     padding: 30px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.12);
 }
 
 .input-panel {
@@ -96,7 +113,7 @@ body {
 }
 
 .panel h2 {
-    color: #667eea;
+    color: var(--brand-point);
     margin-bottom: 20px;
     font-size: 1.4em;
     display: flex;
@@ -131,7 +148,7 @@ body {
 .form-group select:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: var(--brand-point);
 }
 
 .form-group textarea {
@@ -157,7 +174,7 @@ body {
 }
 
 .tab.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--brand-grad);
     color: white;
 }
 
@@ -201,12 +218,12 @@ body {
     height: 18px;
     margin-right: 10px;
     cursor: pointer;
-    accent-color: #667eea;
+    accent-color: var(--brand-point);
     border: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .selection-item input[type="checkbox"]:checked {
-    accent-color: #764ba2;
+    accent-color: var(--brand-point);
 }
 
 .selection-item label {
@@ -218,7 +235,7 @@ body {
 
 .selected-count {
     font-size: 0.85em;
-    color: #667eea;
+    color: var(--brand-point);
     margin-top: 10px;
     font-weight: 600;
 }
@@ -226,7 +243,7 @@ body {
 .btn-primary {
     width: 100%;
     padding: 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--brand-grad);
     color: white;
     border: none;
     border-radius: 10px;
@@ -238,7 +255,7 @@ body {
 
 .btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 8px 20px rgba(var(--brand-point-rgb), 0.4);
 }
 
 .btn-primary:disabled {
@@ -280,7 +297,7 @@ body {
     width: 60px;
     height: 60px;
     border: 5px solid #f3f3f3;
-    border-top: 5px solid #667eea;
+    border-top: 5px solid var(--brand-point);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 20px;
@@ -319,22 +336,22 @@ body {
 
 .section-title {
     font-size: 1.3em;
-    color: #667eea;
+    color: var(--brand-point);
     margin-bottom: 15px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #667eea;
+    border-bottom: 2px solid var(--brand-point);
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
 .summary-box {
-    background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+    background: linear-gradient(135deg, rgba(var(--brand-main-rgb),0.06) 0%, rgba(var(--brand-point-rgb),0.06) 100%);
     padding: 20px;
     border-radius: 10px;
     font-size: 1.05em;
     line-height: 1.8;
-    color: #333;
+    color: var(--text);
 }
 
 .metrics-grid {
@@ -349,7 +366,7 @@ body {
 }
 
 .metric-card {
-    background: white;
+    background: var(--surface);
     border: 2px solid #e9ecef;
     border-radius: 12px;
     padding: 20px;
@@ -358,21 +375,21 @@ body {
 }
 
 .metric-card:hover {
-    border-color: #667eea;
+    border-color: var(--brand-point);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .metric-label {
     font-size: 0.9em;
-    color: #666;
+    color: var(--muted);
     margin-bottom: 8px;
 }
 
 .metric-value {
     font-size: 2em;
     font-weight: 700;
-    color: #667eea;
+    color: var(--brand-point);
 }
 
 .metric-unit {
@@ -437,7 +454,7 @@ body {
 
 .score-fill {
     height: 100%;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    background: var(--brand-grad);
     transition: width 0.5s ease;
 }
 
@@ -450,8 +467,8 @@ body {
 }
 
 .badge-sector {
-    background: #e7f3ff;
-    color: #0066cc;
+    background: rgba(var(--brand-point-rgb), 0.12);
+    color: var(--brand-point);
 }
 
 /* AI 엔진 선택 스타일 */
@@ -475,14 +492,14 @@ body {
 }
 
 .engine-label:hover {
-    border-color: #667eea;
+    border-color: var(--brand-point);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    box-shadow: 0 4px 12px rgba(var(--brand-point-rgb), 0.15);
 }
 
 .ai-engine-option input[type="radio"]:checked + .engine-label {
-    border-color: #667eea;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: var(--brand-point);
+    background: var(--brand-grad-ud);
     color: white;
 }
 
@@ -606,7 +623,7 @@ body {
     border-radius: 50%;
     opacity: 0;
     transform: translate(-50%, -50%);
-    background: conic-gradient(from 0deg, #667eea, #764ba2, #667eea);
+    background: conic-gradient(from 0deg, var(--brand-main), var(--brand-point), var(--brand-main));
 }
 
 .pulse-ring::before {
@@ -673,10 +690,10 @@ body {
 .step-message {
     font-size: 1.1em;
     font-weight: 500;
-    color: #667eea;
+    color: var(--brand-point);
     text-align: center;
     padding: 12px 20px;
-    background: rgba(102, 126, 234, 0.1);
+    background: rgba(var(--brand-point-rgb), 0.08);
     border-radius: 10px;
     word-wrap: break-word;
     line-height: 1.4;
@@ -733,16 +750,16 @@ body {
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    background: var(--brand-grad);
     border-radius: 10px;
     width: 0%;
     transition: width 0.5s ease;
-    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 10px rgba(var(--brand-point-rgb), 0.3);
 }
 
 .progress-text {
     font-weight: 600;
-    color: #667eea;
+    color: var(--brand-point);
     min-width: 40px;
     text-align: right;
 }
