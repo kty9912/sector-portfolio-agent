@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ⭐ 예산 포맷팅 함수
 function formatBudget(num) {
-    num = parseInt(num) || 0;
+    num = parseInt(num.replace(/,/g, '')) || 0;
     if (num <= 0) return '0원';
 
     const numKor = {'0': '', '1': '일', '2': '이', '3': '삼', '4': '사', '5': '오', '6': '육', '7': '칠', '8': '팔', '9': '구'};
@@ -849,6 +849,41 @@ function renderSunburstFromConfig(data) {
         createSunburstFromData(data.portfolio_allocation);
     }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("budgetInput");
+
+    if (!input) {
+        console.error("❌ budgetInput 요소를 찾을 수 없습니다.");
+        return;
+    }
+
+    // 숫자만 남기고 콤마 포맷
+    const formatNumber = (value) => {
+        if (!value) return "";
+        // 숫자만 남기기
+        const numericValue = value.replace(/[^0-9]/g, "");
+        // 세 자리 콤마
+        return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    };
+
+    // 처음 로드시 한 번 포맷팅
+    input.value = formatNumber(input.value);
+
+    input.addEventListener("input", () => {
+        const cursorPos = input.selectionStart;
+        const before = input.value;
+
+        const formatted = formatNumber(before);
+        input.value = formatted;
+
+        // 커서 위치 보정
+        const diff = formatted.length - before.length;
+        const newPos = (cursorPos || 0) + diff;
+        input.setSelectionRange(newPos, newPos);
+    });
+});
+
 
 // ⭐ Sunburst 차트를 직접 생성하는 함수 (백업용) - 3단계 구조
 function createSunburstFromData(portfolio) {
