@@ -13,6 +13,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 import io
 from datetime import datetime
+import time
 
 from agents.portfolio_agent_anthropic import run_portfolio_agent, AVAILABLE_STOCKS, SECTORS
 from agents.portfolio_agent_multi import run_multi_agent_portfolio
@@ -109,6 +110,9 @@ async def get_available_models():
 @app.post("/api/analyze/anthropic")
 async def analyze_anthropic(request: Request):
     """Anthropic 엔진으로 포트폴리오 분석"""
+    # ⭐ 타이머 시작
+    start_time = time.time()
+    start_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         body = await request.json()
         
@@ -137,6 +141,21 @@ async def analyze_anthropic(request: Request):
             additional_prompt=additional_prompt
         )
         
+
+        #  타이머 종료
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        end_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 시간 포맷팅
+        minutes = int(elapsed_time // 60)
+        seconds = int(elapsed_time % 60)
+        #  로그 출력
+        print(f"\n⏱️  분석 소요 시간: {minutes}분 {seconds}초 ({elapsed_time:.2f}초)")
+        print(f"  시작: {start_datetime}")
+        print(f"  종료: {end_datetime}")
+        print("="*60 + "\n")
+
+
         if result["success"]:
             # 공통 파싱 함수 사용
             data = parse_agent_result(result, engine="anthropic")
@@ -150,14 +169,25 @@ async def analyze_anthropic(request: Request):
                 "iterations": result.get("iterations", 1)
             })
         else:
+            # 에러 시에도 소요 시간 표시
+            elapsed_time = time.time() - start_time
+            print(f"\n❌ 에러 발생 (소요 시간: {elapsed_time:.2f}초): {e}")
             raise HTTPException(status_code=500, detail=result.get("error", "알 수 없는 오류"))
     
     except Exception as e:
+        # 에러 시에도 소요 시간 표시
+        elapsed_time = time.time() - start_time
+        print(f"\n❌ 에러 발생 (소요 시간: {elapsed_time:.2f}초): {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"서버 오류: {str(e)}")
 
 @app.post("/api/analyze/langgraph")
 async def analyze_langgraph(request: Request):
+    """LangGraph 엔진으로 포트폴리오 분석"""
+    # ⭐ 타이머 시작
+    start_time = time.time()
+    start_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     try:
         body = await request.json()
         
@@ -186,6 +216,21 @@ async def analyze_langgraph(request: Request):
             additional_prompt=additional_prompt,
             model_name=model_name
         )
+
+
+        # 타이머 종료
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        end_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 시간 포맷팅
+        minutes = int(elapsed_time // 60)
+        seconds = int(elapsed_time % 60)
+        #  로그 출력
+        print(f"\n⏱️  분석 소요 시간: {minutes}분 {seconds}초 ({elapsed_time:.2f}초)")
+        print(f"  시작: {start_datetime}")
+        print(f"  종료: {end_datetime}")
+        print("="*60 + "\n")
+
         
         # 결과 반환
         return JSONResponse(content={
@@ -196,6 +241,9 @@ async def analyze_langgraph(request: Request):
         
     except Exception as e:
         print("에러:", e)
+        # 에러 시에도 소요 시간 표시
+        elapsed_time = time.time() - start_time
+        print(f"\n❌ 에러 발생 (소요 시간: {elapsed_time:.2f}초): {e}")
         raise HTTPException(status_code=500, detail=f"서버 오류: {str(e)}")
 
 # =====================================================
