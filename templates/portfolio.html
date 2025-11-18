@@ -6,9 +6,20 @@
     <title>AI 투자 포트폴리오 분석 v2</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>  <!-- ✅ 이미 있음 -->
-    <link rel="stylesheet" href="/static/index.css">
+    <link rel="stylesheet" href="/static/portfolio.css">
 </head>
 <body>
+    <!-- 네비게이션 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">AI 투자 분석</div>
+            <div class="nav-links">
+                <a href="/">홈</a>
+                <a href="/portfolio">포트폴리오 분석</a>
+                <a href="/stock">종목 분석</a>
+            </div>
+        </div>
+    </nav>
     <div class="container">
         <div class="header">
             <h1>AI 투자 포트폴리오 분석 시스템</h1>
@@ -126,7 +137,6 @@
                 </div>
                 
                 <div id="loadingState" class="loading" style="display: none;">
-                    <!-- 메인 로딩 애니메이션 -->
                     <div class="loading-animation">
                         <div class="brain-icon">
                             <svg viewBox="0 0 100 100" width="80" height="80">
@@ -135,21 +145,11 @@
                                 <text x="50" y="58" text-anchor="middle" fill="#667eea" font-size="24" font-weight="bold">AI</text>
                             </svg>
                         </div>
-                        <div class="pulse-rings">
-                            <div class="pulse-ring ring-1"></div>
-                            <div class="pulse-ring ring-2"></div>
-                            <div class="pulse-ring ring-3"></div>
-                        </div>
                     </div>
-                    
-                    <!-- 로딩 텍스트 -->
                     <div class="loading-text">
-                        <!-- 단계 메시지 -->
                         <div class="loading-steps">
                             <div class="step-message" id="stepMessage">데이터를 수집하고 있습니다</div>
                         </div>
-                        
-                        <!-- 진행률 바 -->
                         <div class="progress-section">
                             <div class="progress-container">
                                 <div class="progress-bar">
@@ -169,13 +169,13 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
-            <p>© 2025 AI 투자 포트폴리오 분석 시스템</p>
+            <p>© 2025 금융 투자 AI Agent 플랫폼</p>
             <p class="footer-disclaimer">
                 Powered by Advanced AI Technology
             </p>
         </div>
     </footer>
     
-    <script src="/static/index.js"></script>
+    <script src="/static/portfolio.js"></script>
 </body>
 </html>

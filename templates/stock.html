@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 단일 종목 분석 시스템</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="/static/stock.css">
+</head>
+<body>
+    <!-- 네비게이션 -->
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="logo">AI 투자 분석</div>
+            <div class="nav-links">
+                <a href="/">홈</a>
+                <a href="/portfolio">포트폴리오 분석</a>
+                <a href="/stock">종목 분석</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="header">
+            <h1>AI 단일 종목 분석 시스템</h1>
+            <p>데이터 기반 투자 전략 분석</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- 입력 패널 -->
+            <div class="panel input-panel">
+                <h2>종목 분석 조건</h2>
+                
+                <form id="analysisForm">          
+                    <!-- AI 분석 엔진 선택 -->
+                    <div class="form-group">
+                        <label>AI 분석 엔진</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="ai-engine-option">
+                                <input type="radio" id="anthropic" name="aiEngine" value="anthropic">
+                                <label for="anthropic" class="engine-label">
+                                    <div class="engine-title">Anthropic</div>
+                                    <div class="engine-desc">빠르고 안정적인 분석</div>
+                                </label>
+                            </div>
+                            <div class="ai-engine-option">
+                                <input type="radio" id="langgraph" name="aiEngine" value="langgraph" checked>
+                                <label for="langgraph" class="engine-label">
+                                    <div class="engine-title">LangGraph</div>
+                                    <div class="engine-desc">고급 그래프 기반 분석</div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 1. 종목 선택 -->
+                    <div class="form-group">
+                        <label>분석 종목</label>
+                        <select id="stockSelect" name="ticker" required>
+                            <option value="">종목을 선택하세요</option>
+                        </select>
+                        <div class="ticker-examples" style="margin-top: 8px;">
+                            <small>등록된 종목 중에서 선택하세요</small>
+                        </div>
+                    </div>
+                    
+                    <!-- 2. 투자 성향 -->
+                    <div class="form-group">
+                        <label>투자 위험 성향</label>
+                        <select name="profile" required>
+                            <option value="conservative">안정 (낮은 변동성, 안전 자산 선호)</option>
+                            <option value="balanced" selected>균형 (적정 리스크와 수익 추구)</option>
+                            <option value="aggressive">공격 (높은 수익률 추구)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 3. 모델 선택 -->
+                    <div class="form-group">
+                        <label>분석 모델</label>
+                        <select id="modelSelect" name="model_name">
+                            <option value="">모델 로딩 중...</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary" id="analyzeBtn">
+                        종목 분석 시작
+                    </button>
+                </form>
+            </div>
+            
+            <!-- 결과 패널 -->
+            <div class="panel result-panel">
+                <h2>분석 결과</h2>
+                
+                <div id="emptyState" class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                    </svg>
+                    <h3>종목 코드를 입력하세요</h3>
+                    <p>AI가 종합적인 투자 분석을 제공합니다</p>
+                </div>
+                
+                <div id="loadingState" class="loading" style="display: none;">
+                    <div class="loading-animation">
+                        <div class="brain-icon">
+                            <svg viewBox="0 0 100 100" width="80" height="80">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#667eea" stroke-width="3" opacity="0.2"/>
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#667eea" stroke-width="3" stroke-linecap="round" class="loading-circle"/>
+                                <text x="50" y="58" text-anchor="middle" fill="#667eea" font-size="24" font-weight="bold">AI</text>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="loading-text">
+                        <div class="loading-steps">
+                            <div class="step-message" id="stepMessage">데이터를 수집하고 있습니다</div>
+                        </div>
+                        <div class="progress-section">
+                            <div class="progress-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                                <div class="progress-text" id="progressText">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="resultContent" class="result-content"></div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="footer">
+        <div class="footer-content">
+            <p>© 2025 금융 투자 AI Agent 플랫폼</p>
+            <p class="footer-disclaimer">Powered by Advanced AI Technology</p>
+        </div>
+    </footer>
+    
+    <script src="/static/stock.js"></script>
+</body>
+</html>

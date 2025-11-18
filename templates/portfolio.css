@@ -4,16 +4,64 @@
     box-sizing: border-box;
 }
 
+/* 네비게이션 */
+.navbar {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 15px 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.navbar-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-size: 1.5em;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    cursor: pointer;
+}
+
+.nav-links {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+}
+
+.nav-links a {
+    color: #333;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+    font-size: 0.95em;
+}
+
+.nav-links a:hover {
+    color: #667eea;
+}
+
 body {
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
-    padding: 20px;
 }
 
 .container {
     max-width: 1600px;
     margin: 0 auto;
+    padding: 20px;
 }
 
 .header {
@@ -264,7 +312,6 @@ body {
 
 .summary-box {
     background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-    border-left: 4px solid #667eea;
     padding: 20px;
     border-radius: 10px;
     font-size: 1.05em;
@@ -434,7 +481,6 @@ body {
     border-radius: 8px;
     padding: 20px;
     margin-top: 40px;
-    border-left: 4px solid #ffc107;
 }
 
 .disclaimer p {
@@ -668,7 +714,7 @@ body {
     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
     border-radius: 10px;
     width: 0%;
-    transition: width 0.5s ease;
+    transition: width 1.5s ease-out;
     box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
 }
 
