@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ⭐ 예산 포맷팅 함수
 function formatBudget(num) {
-    num = parseInt(num) || 0;
+    num = parseInt(num.replace(/,/g, '')) || 0;
     if (num <= 0) return '0원';
 
     const numKor = {'0': '', '1': '일', '2': '이', '3': '삼', '4': '사', '5': '오', '6': '육', '7': '칠', '8': '팔', '9': '구'};
@@ -391,7 +391,7 @@ function renderResults(reportText, iterations) {
         data.discussion_history.forEach((opinion, idx) => {
             // 전문가 타입 감지 (재무/기술/뉴스)
             let expertType = '전문가';
-            let expertColor = '#667eea';
+            let expertColor = '#26a69a';
             
             if (opinion.includes('[재무 전문가]') || opinion.includes('Financial Agent')) {
                 expertType = '재무 전문가';
@@ -586,7 +586,7 @@ function renderResults(reportText, iterations) {
                                 <div class="score-fill" style="width: ` + stock.scores.news + `%"></div>
                             </div>
                         </td>
-                        <td><strong style="color: #667eea; font-size: 1.1em;">` + avgScore + `점</strong></td>
+                        <td><strong style="color: #26a69a; font-size: 1.1em;">` + avgScore + `점</strong></td>
                     </tr>
                 `;
             }
@@ -617,7 +617,7 @@ function renderResults(reportText, iterations) {
         <!-- 투자 책임 경고 -->
         <div class="disclaimer" style="background: rgba(255, 243, 205, 0.3); border-radius: 8px; padding: 20px; margin-top: 40px;">
             <p style="color: #495057; font-size: 0.9em; line-height: 1.6; margin: 0;">
-                ⚠️ <strong style="color: #f39c12;">투자 유의사항</strong><br>
+                ⚠️ <strong style="color: rgba(255, 243, 205, 0.3);">투자 유의사항</strong><br>
                 본 분석 결과는 AI 알고리즘 기반의 참고 자료이며, 투자 권유나 종목 추천이 아닙니다. 
                 과거 데이터와 통계 분석을 기반으로 생성된 정보이므로, 미래 수익을 보장하지 않습니다. 
                 모든 투자 결정과 그에 따른 손익은 투자자 본인의 책임입니다.
@@ -662,10 +662,10 @@ function renderResults(reportText, iterations) {
                         .section { margin-bottom: 30px; page-break-inside: avoid; }
                         .section-title { 
                             font-size: 22px; 
-                            color: #667eea; 
+                            color: #26a69a; 
                             margin-bottom: 15px; 
                             padding-bottom: 10px; 
-                            border-bottom: 2px solid #667eea; 
+                            border-bottom: 2px solid #26a69a; 
                         }
                         .summary-box {
                             background: #f8f9fa;
@@ -686,7 +686,7 @@ function renderResults(reportText, iterations) {
                             border-radius: 8px;
                         }
                         .metric-label { font-size: 12px; color: #666; margin-bottom: 8px; }
-                        .metric-value { font-size: 28px; font-weight: bold; color: #667eea; }
+                        .metric-value { font-size: 28px; font-weight: bold; color: #26a69a; }
                         .metric-unit { font-size: 14px; color: #999; }
                         .stock-table {
                             width: 100%;
@@ -715,7 +715,7 @@ function renderResults(reportText, iterations) {
                         }
                         .score-fill {
                             height: 100%;
-                            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                            background: linear-gradient(90deg, #26a69a 0%, #37474f 100%);
                         }
                         .badge {
                             display: inline-block;
@@ -726,7 +726,7 @@ function renderResults(reportText, iterations) {
                         }
                         .badge-sector { background: #e7f3ff; color: #0066cc; }
                         h1 { 
-                            color: #667eea; 
+                            color: #26a69a; 
                             text-align: center; 
                             margin-bottom: 30px;
                             font-size: 28px;
@@ -850,6 +850,41 @@ function renderSunburstFromConfig(data) {
     }
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+    const input = document.getElementById("budgetInput");
+
+    if (!input) {
+        console.error("❌ budgetInput 요소를 찾을 수 없습니다.");
+        return;
+    }
+
+    // 숫자만 남기고 콤마 포맷
+    const formatNumber = (value) => {
+        if (!value) return "";
+        // 숫자만 남기기
+        const numericValue = value.replace(/[^0-9]/g, "");
+        // 세 자리 콤마
+        return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    };
+
+    // 처음 로드시 한 번 포맷팅
+    input.value = formatNumber(input.value);
+
+    input.addEventListener("input", () => {
+        const cursorPos = input.selectionStart;
+        const before = input.value;
+
+        const formatted = formatNumber(before);
+        input.value = formatted;
+
+        // 커서 위치 보정
+        const diff = formatted.length - before.length;
+        const newPos = (cursorPos || 0) + diff;
+        input.setSelectionRange(newPos, newPos);
+    });
+});
+
+
 // ⭐ Sunburst 차트를 직접 생성하는 함수 (백업용) - 3단계 구조
 function createSunburstFromData(portfolio) {
     if (!portfolio || portfolio.length === 0) {
@@ -857,15 +892,15 @@ function createSunburstFromData(portfolio) {
     }
     
     const colorMap = {
-        '반도체': '#4A5FC1',
-        '바이오': '#5C3D7C',
-        '방산': '#C94E8C',
-        '통신': '#2A7FBA',
-        '원자력': '#2D8F5C',
-        '전력망': '#D63D5C',
-        '조선': '#DAA520',
-        'AI': '#FF6B9D',
-        '기타': '#1B8B8B'
+        '반도체': '#5c6bc0',
+        '바이오': '#26a69a',
+        '방산': '#78909c',
+        '통신': '#7e57c2',
+        '원자력': '#ef5350',
+        '전력망': '#ffa726',
+        '조선': '#42a5f5',
+        'AI': '#7e57c2',
+        '기타': '#26a69a'
     };
     
     function lightenColor(hex, level) {
@@ -1023,14 +1058,14 @@ function renderPerformanceChart(data) {
                 mode: 'lines+markers',
                 name: '포트폴리오',
                 line: {
-                    color: '#667eea',
+                    color: '#26a69a',
                     width: 3,
                     shape: 'spline'
                 },
                 fill: 'tonexty',
-                fillcolor: 'rgba(102, 126, 234, 0.1)',
+                fillcolor: 'rgba(38, 166, 154, 0.1)',
                 marker: {
-                    color: '#667eea',
+                    color: '#26a69a',
                     size: 6
                 },
                 hovertemplate: '<b>포트폴리오</b><br>기간: %{x}<br>수익률: %{y:.1f}%<extra></extra>'

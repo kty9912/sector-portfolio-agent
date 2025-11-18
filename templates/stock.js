@@ -290,7 +290,7 @@ function renderResults(data, chartData, sectorComparison) {
     let html = `
         <!-- 헤더 섹션 -->
         <div style="
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--brand-grad);
             padding: 40px;
             border-radius: 15px;
             margin-bottom: 30px;
@@ -332,7 +332,7 @@ function renderResults(data, chartData, sectorComparison) {
         </div>
         
         <!-- 종합 점수 -->
-        <div class="section" style="margin-top: 80px;">
+                    <div class="section" style="margin-top: 80px;">
             <div class="section-title">종합 평가 점수</div>
             <div class="metrics-grid four-columns">
                 <div class="metric-card">
@@ -358,7 +358,7 @@ function renderResults(data, chartData, sectorComparison) {
                 </div>
                 <div class="metric-card">
                     <div class="metric-label">종합 점수</div>
-                    <div class="metric-value" style="color: #667eea;">${scores.overall_score || 0}</div>
+                    <div class="metric-value" style="color: var(--brand-point);">${scores.overall_score || 0}</div>
                     <div class="score-bar">
                         <div class="score-fill" style="width: ${scores.overall_score || 0}%"></div>
                     </div>
@@ -591,10 +591,10 @@ function renderResults(data, chartData, sectorComparison) {
     // 뉴스 하이라이트
     if (news.recent_news_highlights && news.recent_news_highlights.length > 0) {
         html += '<div style="margin-top: 20px;">';
-        news.recent_news_highlights.forEach(item => {
+            news.recent_news_highlights.forEach(item => {
             html += `
                 <div class="summary-box" style="margin-bottom: 10px; background: #f8f9fa;">
-                    <h4 style="color: #667eea; margin-bottom: 8px;">${item.title}</h4>
+                    <h4 style="color: var(--brand-point); margin-bottom: 8px;">${item.title}</h4>
                     <p style="font-size: 0.95em;">${item.summary}</p>
                 </div>
             `;
@@ -674,12 +674,6 @@ function renderResults(data, chartData, sectorComparison) {
                 PDF 다운로드
             </button>
         </div>
-        
-        <!-- 디버그 정보 (개발용) -->
-        <details style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
-            <summary style="cursor: pointer; font-weight: 600; color: #667eea;">상세 데이터 확인 (클릭)</summary>
-            <pre style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px; overflow-x: auto; font-size: 0.85em;">${JSON.stringify(data, null, 2)}</pre>
-        </details>
     `;
     
     document.getElementById('resultContent').innerHTML = html;
@@ -795,7 +789,7 @@ function renderResults(data, chartData, sectorComparison) {
                 <body>
                     <div class="container">
                         <div style="text-align: center; margin-bottom: 30px; padding-top: 20px;">
-                            <h1 style="color: #667eea; font-size: 2em; margin-bottom: 10px;">AI 단일 종목 분석 보고서</h1>
+                            <h1 style="color: var(--brand-point); font-size: 2em; margin-bottom: 10px;">AI 단일 종목 분석 보고서</h1>
                             <p style="color: #666; font-size: 1em;">
                                 생성일시: ${new Date().toLocaleString('ko-KR')}
                             </p>
@@ -928,7 +922,7 @@ function getRecommendationColor(rating) {
         'HOLD': 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
         'SELL': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
     };
-    return colors[rating] || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    return colors[rating] || 'var(--brand-grad)';
 }
 
 // 기술적 지표 헬퍼 함수들
@@ -1154,7 +1148,7 @@ function fillValuationComparisonTable(sectorComparison) {
     sectorComparison.comparisons.forEach(comp => {
         const isTarget = comp.is_target;
         const rowStyle = isTarget ? 'background: #f0f9ff; font-weight: 600;' : '';
-        const remarkText = isTarget ? '<span style="color: #667eea; font-weight: 600;">분석 대상</span>' : '<span style="color: #666;">경쟁사</span>';
+    const remarkText = isTarget ? '<span style="color: var(--brand-point); font-weight: 600;">분석 대상</span>' : '<span style="color: #666;">경쟁사</span>';
         
         html += `
             <tr style="border-bottom: 1px solid #dee2e6; ${rowStyle}">
@@ -1212,7 +1206,7 @@ function renderCharts(chartData, targetPrice, currentPrice) {
             type: 'scatter',
             mode: 'lines',
             name: '종가',
-            line: { color: '#6366F1', width: 2.5 }
+            line: { color: '#26a69a', width: 2.5 }
         };
         
         const ma20Trace = {
@@ -1221,7 +1215,7 @@ function renderCharts(chartData, targetPrice, currentPrice) {
             type: 'scatter',
             mode: 'lines',
             name: '20일 이평선',
-            line: { color: '#818CF8', width: 1.5, dash: 'dash' }
+            line: { color: '#0288d1', width: 1.5, dash: 'dash' }
         };
         
         const ma60Trace = {
@@ -1230,7 +1224,7 @@ function renderCharts(chartData, targetPrice, currentPrice) {
             type: 'scatter',
             mode: 'lines',
             name: '60일 이평선',
-            line: { color: '#C7D2FE', width: 1.5, dash: 'dash' }
+            line: { color: '#78909c', width: 1.5, dash: 'dash' }
         };
         
         const traces = [priceTrace, ma20Trace, ma60Trace];
@@ -1246,7 +1240,7 @@ function renderCharts(chartData, targetPrice, currentPrice) {
                     type: 'scatter',
                     mode: 'lines',
                     name: '목표가',
-                    line: { color: '#F59E0B', width: 2.5, dash: 'dot' }
+                    line: { color: '#ff6f00', width: 2.5, dash: 'dot' }
                 });
             }
         }
@@ -1279,7 +1273,7 @@ function renderCharts(chartData, targetPrice, currentPrice) {
             y: revenues,
             type: 'bar',
             name: '매출액',
-            marker: { color: '#A5B4FC' }
+            marker: { color: '#b0bec5' }
         };
         
         const opIncomeTrace = {
@@ -1287,7 +1281,7 @@ function renderCharts(chartData, targetPrice, currentPrice) {
             y: opIncomes,
             type: 'bar',
             name: '영업이익',
-            marker: { color: '#6366F1' }
+            marker: { color: '#80cbc4' }
         };
         
         const netIncomeTrace = {
@@ -1295,7 +1289,7 @@ function renderCharts(chartData, targetPrice, currentPrice) {
             y: netIncomes,
             type: 'bar',
             name: '순이익',
-            marker: { color: '#CBD5E1' }
+            marker: { color: '#4fc3f7' }
         };
         
         const financialLayout = {

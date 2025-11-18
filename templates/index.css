@@ -4,11 +4,28 @@
     box-sizing: border-box;
 }
 
+:root {
+    /* Charcoal / Platinum / Mint theme (keeps parity with templates/test_design.css) */
+    --brand-main: #37474f; /* charcoal */
+    --brand-point: #26a69a; /* mint */
+    --brand-grad: linear-gradient(135deg, var(--brand-main) 0%, var(--brand-point) 100%);
+    --brand-grad-ud: linear-gradient(180deg, var(--brand-main) 0%, var(--brand-point) 100%);
+    --brand-main-rgb: 55,71,79;
+    --brand-point-rgb: 38,166,154;
+
+    --bg: #f6f7f8; /* platinum-ish background */
+    --surface: #ffffff;
+    --surface-grad: linear-gradient(135deg, #ffffff 0%, #f6f7f8 100%);
+    --text: #263238; /* dark slate */
+    --muted: #666666;
+    --success: #2e7d32;
+}
+
 body {
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--brand-grad-ud);
     min-height: 100vh;
-    color: #333;
+    color: var(--text);
 }
 
 /* 네비게이션 */
@@ -34,7 +51,7 @@ body {
 .logo {
     font-size: 1.5em;
     font-weight: 700;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--brand-main);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -48,15 +65,15 @@ body {
 }
 
 .nav-links a {
-    color: #333;
+    color: var(--text);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: 700;
     transition: color 0.3s;
-    font-size: 0.95em;
+    font-size: 1.1em;
 }
 
 .nav-links a:hover {
-    color: #667eea;
+    color: var(--brand-point);
 }
 
 /* 히어로 섹션 */
@@ -118,7 +135,7 @@ body {
 }
 
 .feature-card {
-    background: white;
+    background: var(--surface);
     border-radius: 20px;
     padding: 40px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.15);
@@ -135,7 +152,7 @@ body {
     left: 0;
     right: 0;
     height: 6px;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    background: var(--brand-grad);
     transform: scaleX(0);
     transition: transform 0.3s ease;
 }
@@ -152,14 +169,15 @@ body {
 .feature-icon {
     width: 80px;
     height: 80px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* background: var(--brand-grad); */
+    background: var(--brand-grad-ud);
     border-radius: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 2.5em;
     margin-bottom: 25px;
-    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 8px 20px rgba(var(--brand-point-rgb), 0.3);
 }
 
 .feature-title {
@@ -194,14 +212,15 @@ body {
     content: '✓';
     position: absolute;
     left: 0;
-    color: #667eea;
+    color: var(--brand-point);
     font-weight: 700;
 }
 
 .btn-feature {
     display: inline-block;
     padding: 14px 32px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* background: var(--brand-grad); */
+    background: var(--brand-main);
     color: white;
     border: none;
     border-radius: 10px;
@@ -214,7 +233,7 @@ body {
 
 .btn-feature:hover {
     transform: scale(1.05);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 8px 25px rgba(var(--brand-point-rgb), 0.4);
 }
 
 /* 시장 현황 섹션 */
@@ -240,10 +259,10 @@ body {
 }
 
 .market-card {
-    background: linear-gradient(135deg, #f8f9ff 0%, #e9ecff 100%);
+    background: var(--surface-grad);
     padding: 25px;
     border-radius: 12px;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid var(--brand-point);
 }
 
 .market-label {
@@ -274,15 +293,32 @@ body {
 }
 
 /* 푸터 */
-footer {
-    padding: 40px 20px;
+.footer {
+    margin-top: 40px;
+    padding: 30px 20px;
     text-align: center;
+}
+
+.footer-content {
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.footer-content p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 5px 0;
+}
+
+.footer-content p:first-child {
+    font-weight: 600;
+    font-size: 1em;
     color: white;
 }
 
-footer p {
-    margin: 5px 0;
-    opacity: 0.9;
+.footer-disclaimer {
+    font-size: 0.85em;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 10px;
 }
 
 /* 반응형 */
