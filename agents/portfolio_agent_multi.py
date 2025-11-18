@@ -914,7 +914,7 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
     
     # ⭐ 디버깅: supervisor 실행 횟수 추적
     current_history = state.get("discussion_history", [])
-    print(f"\n\ [Supervisor 디버깅] discussion_history 개수: {len(current_history)}")
+    print(f"\n [Supervisor 디버깅] discussion_history 개수: {len(current_history)}")
     
     print("\n📊 전문가 의견 요약:")
     for idx, msg in enumerate(current_history, 1):
@@ -1278,9 +1278,3 @@ if __name__ == "__main__":
         print(f"\n💡 AI 요약:\n{result['ai_summary']}\n")
         print(f"📈 포트폴리오: {len(result['portfolio_allocation'])}개 종목")
         print(f"📉 예상 수익률: {result['performance_metrics'].get('expected_return', 0)}%")
-
-
-print("\n✅ Step 6 완료: 멀티 에이전트 그래프 구성 완료")
-print("\n🎉 모든 단계 완료! 멀티 에이전트 시스템이 준비되었습니다.")
-print("\n실행 방법:")
-print("  python agent_test/portfolio_agent_multi.py")
