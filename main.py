@@ -1021,8 +1021,6 @@ async def download_pdf(request: dict):
         """
         
         html_with_font = html_content.replace('<head>', '<head>' + font_css)
-
-        print('html_with_font', html_with_font)
         
         # Playwright로 PDF 생성
         def generate_pdf():
