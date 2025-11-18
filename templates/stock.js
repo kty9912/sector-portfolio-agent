@@ -769,7 +769,7 @@ function renderResults(data, chartData, sectorComparison) {
             }
             
             // 3. 기존 CSS 파일 로드
-            const cssResponse = await fetch('/static/stock_analysis.css');
+            const cssResponse = await fetch('/static/stock.css');
             const cssContent = await cssResponse.text();
             
             // 4. PDF 전용 스타일 조정

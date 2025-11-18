@@ -25,7 +25,7 @@ from agents.tools import search_stock_news
 import numpy as np
 
 # 기존 Tool 함수들 import
-from agent_test.stock_agent_anthropic import (
+from agents.stock_agent_anthropic import (
     get_stock_prices,
     get_financial_metrics,
     get_technical_signals,
