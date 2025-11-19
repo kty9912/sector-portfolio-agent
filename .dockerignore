@@ -1,0 +1,16 @@
+.git
+__pycache__
+*.pyc
+*.log
+.venv
+experiments/
+notebooks/
+tests/
+.git
+__pycache__
+*.pyc
+*.log
+.venv
+experiments/
+notebooks/
+tests/
