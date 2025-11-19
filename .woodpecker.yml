@@ -1,43 +1,41 @@
+kind: pipeline
+name: deploy
+
 steps:
-  deploy:
-    image: docker:27
-    pull: true
-
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-    when:
-      event:
-        - push
-      branch:
-        - main
-
+  - name: deploy-to-oci
+    image: docker:26.1.3
     commands:
-      # 0. bash 설치
       - apk add --no-cache bash
 
-      - echo -e "\033[0;34m[STEP]--------------------------------------------\033[0m"
-      - echo -e "\033[0;34m[STEP] Woodpecker 배포 시작\033[0m"
+      # 경로 디버깅 (어디에 Dockerfile이 있는지 확인)
+      - echo -e "\033[1;36m[DEBUG] Current directory\033[0m"
+      - pwd
+      - ls -al
 
-      # 1. 기존 컨테이너 정리
-      - echo -e "\033[0;34m[STEP] 기존 컨테이너 중지 + 삭제\033[0m"
+      - echo -e "\033[1;34m[STEP]--------------------------------------------\033[0m"
+      - echo -e "\033[1;34m[STEP] 배포 시작\033[0m"
+
+      # 기존 컨테이너 정리
+      - echo -e "\033[1;34m[STEP] 기존 컨테이너 중지 + 삭제\033[0m"
       - docker stop fin-agent-app || true
       - docker rm fin-agent-app || true
       - echo -e "\033[0;32m[INFO] 기존 컨테이너 정리 완료\033[0m"
 
-      # 2. 이미지 빌드 (Woodpecker 작업공간에서, 즉 레포 내용 기준)
-      - echo -e "\033[0;34m[STEP] Docker 이미지 빌드 시작\033[0m"
-      - cd /woodpecker/src
+      # Docker 이미지 빌드
+      - echo -e "\033[1;34m[STEP] Docker 이미지 빌드 시작\033[0m"
       - docker build -t fin-agent-app .
-      - echo -e "\033[0;32m[INFO] 이미지 빌드 성공 (fin-agent-app)\033[0m"
 
-      # 3. 새 컨테이너 실행 (서버의 .env 사용)
-      - echo -e "\033[0;34m[STEP] 새 컨테이너 실행\033[0m"
+      # 컨테이너 실행
+      - echo -e "\033[1;34m[STEP] 새 컨테이너 실행\033[0m"
       - docker run -d --name fin-agent-app \
           --network fin-net \
           -p 8000:8000 \
-          --env-file /home/opc/financial-strategy-agent/.env \
+          --env-file .env \
           fin-agent-app
 
-      - echo -e "\033[0;32m[DONE] 배포 완료!\033[0m"
-      - docker ps | grep fin-agent-app || true
+      - echo -e "\033[0;32m[SUCCESS] 배포 완료!\033[0m"
+      - docker ps | grep fin-agent-app
+
+when:
+  event: push
+  branch: main
