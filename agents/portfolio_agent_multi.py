@@ -64,6 +64,16 @@ class MultiAgentState(TypedDict):
     messages: Annotated[List[BaseMessage], operator.add]  # ⭐ 병렬 업데이트 허용
     iteration: int
 
+    # validation 관련
+    validation_attempts: int
+    validation_passed: bool
+    validation_issues: List[str]
+    max_validation_retries: int
+
+    # aggregator 관련
+    ready_flags: Dict[str, bool]
+    all_ready: bool
+
 
 # =====================================================
 # DB 로드 함수 (기존과 동일)
@@ -995,9 +1005,6 @@ def _validate_chart_data(chart: Any, issues: List[str]):
                 if parent and parent not in names:
                     issues.append(f"sunburst_parent_missing:{parent}")
 
-        if total_value > 0 and abs(total_value - 1.0) > 0.05:
-            issues.append(f"sunburst_values_sum_mismatch:sum={total_value:.3f}")
-
     # expected_performance
     exp_perf = chart.get("expected_performance") if isinstance(chart, dict) else None
     if exp_perf is None:
@@ -1046,9 +1053,6 @@ def _validate_portfolio_items(final_portfolio: List[Dict[str, Any]], issues: Lis
 def validation_node(state: MultiAgentState) -> MultiAgentState:
     """
     검증 노드: 최종 포트폴리오 데이터 검증 및 교정
-    - DB에 없는 ticker 제거
-    - ticker, name, sector를 DB 데이터로 강제 교체
-    - 현재가 정보 업데이트
     """
     print("\n" + "="*60)
     print("✅ [검증] 최종 포트폴리오 데이터 검증")
@@ -1090,12 +1094,10 @@ def validation_node(state: MultiAgentState) -> MultiAgentState:
             print(f"  ⚠️ {ticker}: DB에 없는 종목 또는 ticker 누락 (제외됨)")
             continue
 
-        # enforce canonical name/sector from DB
         stock["ticker"] = ticker
         stock["name"] = company_infos[ticker].get("name")
         stock["sector"] = company_infos[ticker].get("sector")
 
-        # update current price and calculate shares if amount provided
         if ticker in stock_prices:
             db_price = stock_prices[ticker].get("current_price")
             if db_price:
@@ -1111,7 +1113,6 @@ def validation_node(state: MultiAgentState) -> MultiAgentState:
         if missing:
             issues.append(f"missing_keys_for_{ticker}:{missing}")
 
-        # ensure weight is numeric (normalize done in _normalize_stock when possible)
         w = stock.get("weight")
         try:
             if w is not None:
@@ -1135,53 +1136,53 @@ def validation_node(state: MultiAgentState) -> MultiAgentState:
     if removed:
         issues.append(f"removed_tickers:{removed}")
 
-    validation_passed = (len(final_portfolio) > 0) and (sum([s.get("weight", 0) for s in final_portfolio]) > 0.01) and (not any(k.startswith("missing_keys_for_") for k in issues))
+    # 성패 판단
+    validation_passed = (
+        len(final_portfolio) > 0
+        and (sum([s.get("weight", 0) for s in final_portfolio]) > 0.01)
+        and (not any(k.startswith("missing_keys_for_") for k in issues))
+    )
 
-    # update intermediate state
-    state["portfolio_allocation"] = final_portfolio
-
-    # additional validations using helpers
+    # 추가 검증들
     _validate_performance_metrics(state.get("performance_metrics", {}), issues)
     _validate_chart_data(state.get("chart_data", {}), issues)
     _validate_portfolio_items(final_portfolio, issues)
 
-    state["validation_issues"] = issues
-    state["validation_passed"] = validation_passed
+    # ✅ attempts는 여기서만 증가시키고, diff로 반환
+    previous_attempts = int(state.get("validation_attempts", 0))
+    attempts = previous_attempts + 1
+
+    print(f"  🔁 validation_attempts (incremented unconditionally) -> {attempts}")
 
     print(f"\n✅ 검증 완료: {len(final_portfolio)}개 종목")
     if issues:
         print(f"  ⚠️ 검증 이슈: {issues}")
     print(f"  🔎 validation_passed={validation_passed}")
 
-    return state
+    # 🔥 핵심: state를 mutate하지 않고, 변경된 값만 dict로 반환
+    return {
+        "portfolio_allocation": final_portfolio,
+        "validation_issues": issues,
+        "validation_passed": validation_passed,
+        "validation_attempts": attempts,
+    }
 
 
-def validation_decision_node(state: MultiAgentState):
+
+def route_after_validation(state: MultiAgentState) -> str:
     """
     검증 결과에 따라 LangGraph 내부에서 흐름을 제어하는 결정 노드.
-    - validation_passed가 True이면 'end' 반환
-    - 그렇지 않으면 재시도 카운터(validation_attempts)를 늘리고
-      max_validation_retries보다 작으면 'retry' 반환(-> supervisor 재실행).
-      초과하면 'end' 반환
     """
-    print("\n--- [Validation Decision] 검증 결과 확인 ---")
+    print("\n--- [Route After Validation] 검증 결과 확인 (router) ---")
 
-    # max_retries를 state에서 읽거나 기본값 사용 (초기 상태에서 설정 가능)
     max_retries = int(state.get("max_validation_retries", 2))
 
-    # 기본값 설정
-    if "validation_passed" not in state:
-        state["validation_passed"] = False
-    if "validation_attempts" not in state:
-        state["validation_attempts"] = 0
+    validation_passed = bool(state.get("validation_passed", False))
+    attempts = int(state.get("validation_attempts", 0))
 
-    if state.get("validation_passed"):
+    if validation_passed:
         print("  ✅ 검증 통과: 워크플로우 종료로 이동")
         return "end"
-
-    # 재시도 로직
-    attempts = state.get("validation_attempts", 0) + 1
-    state["validation_attempts"] = attempts
 
     if attempts <= max_retries:
         print(f"  🔁 검증 실패 - 재시도 허용 (attempts={attempts}/{max_retries}) -> Supervisor 재실행")
@@ -1189,6 +1190,7 @@ def validation_decision_node(state: MultiAgentState):
     else:
         print(f"  ⚠️ 최대 재시도 초과 (attempts={attempts}) -> 종료")
         return "end"
+
 
 
 def supervisor_node(state: MultiAgentState) -> MultiAgentState:
@@ -1396,9 +1398,80 @@ def aggregator_node(state: MultiAgentState) -> MultiAgentState:
     LangGraph가 모든 전문가 노드 완료를 기다림 (barrier 역할)
     """
     print("\n" + "="*60)
-    print("🔄 [집계 노드] 3명의 전문가 분석 완료, Supervisor로 전달")
+    print("🔄 [집계 노드] 전문가 분석 결과 집계 중 (barrier 확인)")
     print("="*60)
-    return {}  # 상태 변경 없음, 단순 통과
+
+    # 전문가 결과가 상태에 채워졌는지 확인합니다
+    fin = state.get("financial_analysis")
+    tech = state.get("technical_analysis")
+    news = state.get("news_analysis")
+
+    flags = {
+        "financial": bool(fin),
+        "technical": bool(tech),
+        "news": bool(news),
+    }
+
+    all_ready = all(flags.values())
+
+    state["ready_flags"] = flags
+    state["all_ready"] = all_ready
+
+    if all_ready:
+        print(f"  ✓ 모든 전문가 완료: ready_flags={flags}")
+    else:
+        missing = [k for k, v in flags.items() if not v]
+        print(f"  ⏳ 아직 완료되지 않은 전문가: {missing} - 대기")
+
+    # LangGraph의 barrier 특성 상 이 노드는 모든 병렬 선행이 끝난 뒤 호출됩니다.
+    # 여기서는 명시적으로 준비 여부를 state에 기록하여 이후 노드에서 검사할 수 있도록 합니다.
+    return {"ready_flags": flags, "all_ready": all_ready}
+
+
+def hub_wait(state: MultiAgentState) -> MultiAgentState:
+    """
+    모든 전문가가 준비될 때까지 대기하는 노드
+    간단히 로그만 남기고 상태를 유지합니다.
+    """
+    print("\n" + "="*60)
+    print("⏸ [Hub Wait] 아직 모든 전문가가 준비되지 않았습니다. 대기합니다.")
+    print("="*60)
+    return {}
+
+
+def route_from_aggregator(state: MultiAgentState) -> str:
+    """
+    aggregator의 상태를 보고 supervisor로 진행할지(here: 'go_supervisor')
+    아니면 대기('wait')로 보낼지 결정합니다.
+    """
+    # race-condition을 피하기 위해, state의 all_ready 플래그 대신
+    # 실제 전문가 결과 필드의 존재/비어있음 여부로 판단합니다.
+    fin = state.get("financial_analysis")
+    tech = state.get("technical_analysis")
+    news = state.get("news_analysis")
+
+    fin_ready = bool(fin) and (not (isinstance(fin, dict) and len(fin) == 0))
+    tech_ready = bool(tech) and (not (isinstance(tech, dict) and len(tech) == 0))
+    news_ready = bool(news) and (not (isinstance(news, dict) and len(news) == 0))
+
+    if fin_ready and tech_ready and news_ready:
+        print(f"  ✓ route_from_aggregator: all experts ready (fin_ready={fin_ready}, tech_ready={tech_ready}, news_ready={news_ready})")
+        return "go_supervisor"
+
+    print(f"  ⏳ route_from_aggregator: not ready yet (fin_ready={fin_ready}, tech_ready={tech_ready}, news_ready={news_ready})")
+    return "wait"
+
+
+def aggregator_gate(state: MultiAgentState) -> MultiAgentState:
+    """
+    Aggregator가 반환한 state가 LangGraph에 병합된 뒤 호출되는 게이트 노드.
+    실질적인 처리는 하지 않고, 병합된 최신 state를 통해 conditional routing이
+    안전하게 평가되도록 하는 역할을 합니다.
+    """
+    print("\n" + "="*60)
+    print("🔐 [Aggregator Gate] 병합된 상태 확인, 다음 단계로 라우팅 준비")
+    print("="*60)
+    return {}
 
 
 def build_multi_agent_graph():
@@ -1442,17 +1515,29 @@ def build_multi_agent_graph():
     graph.add_edge("technical_agent", "aggregator")
     graph.add_edge("news_agent", "aggregator")
     
-    # ⭐ aggregator → supervisor (1번만 실행!)
-    graph.add_edge("aggregator", "supervisor")
+    # ⭐ aggregator -> aggregator_gate -> conditional routing (안정화)
+    # aggregator에서 반환한 상태가 LangGraph에 병합된 뒤에 조건 분기를 평가하도록
+    # 중간 게이트 노드를 둡니다. 이로써 race/타이밍 이슈로 인해 잘못된 분기로
+    # 빠지는 것을 방지합니다.
+    graph.add_node("hub_wait", hub_wait)
+    graph.add_node("aggregator_gate", aggregator_gate)
+    graph.add_edge("aggregator", "aggregator_gate")
+    graph.add_conditional_edges(
+        "aggregator_gate",
+        route_from_aggregator,
+        {
+            "go_supervisor": "supervisor",
+            "wait": "hub_wait",
+        },
+    )
     
     # Supervisor 완료 후 검증
     graph.add_edge("supervisor", "validation")  # Supervisor 완료 후 검증
 
-    # 검증 후 결정 노드로 이동 (validation_decision_node에서 'retry' 또는 'end' 반환)
-    graph.add_node("validation_decision", validation_decision_node)
+    # 검증 후 라우터로 분기 (validation 결과에 따라 supervisor로 재실행하거나 종료)
     graph.add_conditional_edges(
         "validation",
-        validation_decision_node,
+        route_after_validation,
         {
             "retry": "supervisor",  # 재시도 -> supervisor로 돌아감
             "end": END               # 종료
@@ -1515,15 +1600,16 @@ def run_multi_agent_portfolio(
         "ai_summary": "",
         
         "messages": [],
-        "iteration": 0
+        "iteration": 0,
+
+        # validation 초기 상태
+        "validation_attempts": 0,
+        "validation_passed": False,
+        "validation_issues": [],
+        # 최대 재시도 횟수 (초기값 — 필요시 환경변수로 오버라이드 가능)
+        "max_validation_retries": 2,
     }
 
-    # validation 관련 초기값을 명시적으로 설정
-    initial_state["validation_attempts"] = 0
-    initial_state["validation_passed"] = False
-    initial_state["validation_issues"] = []
-    # 최대 재시도 횟수는 상태 또는 환경에서 조절 가능
-    initial_state["max_validation_retries"] = 2
     
     # LangGraph 내부에서 validation_decision_node가 재시도/종료를 제어하므로
     # 여기서는 단순히 graph.invoke 결과를 사용합니다.

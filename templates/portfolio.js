@@ -343,6 +343,26 @@ document.getElementById('portfolioForm').addEventListener('submit', async (e) =>
     }
 });
 
+function splitIntoSentences(rawText) {
+  if (!rawText) return [];
+  return rawText
+    .trim()
+    .split(/(?<=[.!?。！？])\s+/g)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+// XSS 방지를 위한 간단 escape (필수까진 아니지만 있으면 안전)
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+}
+
 // 결과 렌더링 함수
 function renderResults(reportText, iterations) {
     let data = null;
@@ -369,13 +389,25 @@ function renderResults(reportText, iterations) {
     }
 
     console.log('data', data);
+
+    const rawSummary = (data.ai_summary || '분석 요약 정보 없음').toString();
+    const sentences = splitIntoSentences(rawSummary);
+
+    const summaryHtml = sentences.length
+        ? sentences
+            .map(s => `<p style="margin-bottom:10px; line-height:1.6;">${escapeHtml(s)}</p>`)
+            .join('')
+        : `<p style="margin-bottom:10px; line-height:1.6;">${escapeHtml(rawSummary)}</p>`;
+
     
     // 구조화된 결과 렌더링
     let html = `
         <!-- 1. AI 종합 요약 -->
         <div class="section">
             <div class="section-title">AI 종합 브리핑</div>
-            <div class="summary-box">` + (data.ai_summary || '분석 요약 정보 없음') + `</div>
+            <div class="summary-box">
+                ${summaryHtml}
+            </div>
         </div>
     `;
     
