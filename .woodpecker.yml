@@ -1,16 +1,11 @@
-# .woodpecker.yml
-
 steps:
   deploy:
     image: docker:27
     pull: true
 
-    # host Docker / 코드 디렉토리 접근
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /home/opc/financial-strategy-agent:/deploy
 
-    # 언제 돌릴지 조건 (main 브랜치 push 때만)
     when:
       event:
         - push
@@ -18,42 +13,31 @@ steps:
         - main
 
     commands:
-      # bash 설치 (echo -e 쓰려고)
+      # 0. bash 설치
       - apk add --no-cache bash
 
-      # 0. 시작 로그
       - echo -e "\033[0;34m[STEP]--------------------------------------------\033[0m"
-      - echo -e "\033[0;34m[STEP] Woodpecker 배포 시작 (코드 동기화)\033[0m"
+      - echo -e "\033[0;34m[STEP] Woodpecker 배포 시작\033[0m"
 
-      # 1. Woodpecker 작업공간 → 실제 배포 디렉토리 복사
-      - rm -rf /deploy/*
-      - cp -r /woodpecker/src/* /deploy/
-      - echo -e "\033[0;32m[INFO] 코드 복사 완료 (/woodpecker/src -> /deploy)\033[0m"
-
-      # 2. 기존 컨테이너 정리
-      - echo -e "\033[0;34m[STEP]--------------------------------------------\033[0m"
+      # 1. 기존 컨테이너 정리
       - echo -e "\033[0;34m[STEP] 기존 컨테이너 중지 + 삭제\033[0m"
       - docker stop fin-agent-app || true
       - docker rm fin-agent-app || true
       - echo -e "\033[0;32m[INFO] 기존 컨테이너 정리 완료\033[0m"
 
-      # 3. 이미지 빌드
-      - echo -e "\033[0;34m[STEP]--------------------------------------------\033[0m"
+      # 2. 이미지 빌드 (Woodpecker 작업공간에서, 즉 레포 내용 기준)
       - echo -e "\033[0;34m[STEP] Docker 이미지 빌드 시작\033[0m"
-      - cd /deploy
+      - cd /woodpecker/src
       - docker build -t fin-agent-app .
       - echo -e "\033[0;32m[INFO] 이미지 빌드 성공 (fin-agent-app)\033[0m"
 
-      # 4. 새 컨테이너 실행
-      - echo -e "\033[0;34m[STEP]--------------------------------------------\033[0m"
+      # 3. 새 컨테이너 실행 (서버의 .env 사용)
       - echo -e "\033[0;34m[STEP] 새 컨테이너 실행\033[0m"
       - docker run -d --name fin-agent-app \
           --network fin-net \
           -p 8000:8000 \
-          --env-file /deploy/.env \
+          --env-file /home/opc/financial-strategy-agent/.env \
           fin-agent-app
 
-      - echo -e "\033[0;32m[INFO] 컨테이너 실행 성공\033[0m"
-      - echo -e "\033[0;34m[STEP]--------------------------------------------\033[0m"
       - echo -e "\033[0;32m[DONE] 배포 완료!\033[0m"
       - docker ps | grep fin-agent-app || true
