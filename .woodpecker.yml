@@ -35,11 +35,7 @@ steps:
 
       # 3. 새 컨테이너 실행
       - echo -e "\033[1;34m[STEP] 새 컨테이너 실행\033[0m"
-      - docker run -d --name fin-agent-app \
-          --network fin-net \
-          -p 8000:8000 \
-          --env-file /home/opc/financial-strategy-agent/.env \
-          fin-agent-app
+      - docker run -d --name fin-agent-app --network fin-net -p 8000:8000 --env-file /home/opc/financial-strategy-agent/.env fin-agent-app
 
       - echo -e "\033[0;32m[SUCCESS] 배포 완료!\033[0m"
       - docker ps | grep fin-agent-app || true
