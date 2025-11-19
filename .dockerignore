@@ -6,11 +6,3 @@ __pycache__
 experiments/
 notebooks/
 tests/
-.git
-__pycache__
-*.pyc
-*.log
-.venv
-experiments/
-notebooks/
-tests/

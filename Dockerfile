@@ -46,11 +46,10 @@ COPY --from=builder /app/.venv ./.venv
 # 전체 소스 복사
 COPY . .
 
-# PATH 지정
+# PATH 지정 (있어도 되고 없어도 되지만, 두어도 OK)
 ENV PATH="/app/.venv/bin:$PATH"
 
-# 서비스 포트
 EXPOSE 8000
 
-# FastAPI 실행
-CMD ["uv", "run", "python", "main.py"]
+CMD ["/app/.venv/bin/python", "main.py"]
+
