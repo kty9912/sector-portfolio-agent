@@ -64,6 +64,16 @@ class MultiAgentState(TypedDict):
     messages: Annotated[List[BaseMessage], operator.add]  # ⭐ 병렬 업데이트 허용
     iteration: int
 
+    # validation 관련
+    validation_attempts: int
+    validation_passed: bool
+    validation_issues: List[str]
+    max_validation_retries: int
+
+    # aggregator 관련
+    ready_flags: Dict[str, bool]
+    all_ready: bool
+
 
 # =====================================================
 # DB 로드 함수 (기존과 동일)
@@ -88,6 +98,62 @@ def load_sector_map() -> Dict[str, str]:
 
 AVAILABLE_STOCKS = load_available_stocks()
 SECTOR_MAP = load_sector_map()
+
+
+def parse_llm_json(raw_text: str) -> Dict[str, Any]:
+    """
+    LLM 출력에서 JSON을 최대한 안전하게 추출해 파싱합니다.
+    전략:
+    1) ```json ... ``` 같은 코드블록이 있으면 그 내부를 우선 사용
+    2) 여러 블록이 있으면 가장 큰 블록을 사용
+    3) 코드블록이 없으면 가장 바깥의 중괄호 쌍({ ... })를 찾아 사용
+    4) 템플릿 아티팩트("{{","}}" 등)을 정리하고, 작은 문자열 정리를 시도
+    5) json.loads 시도 (실패하면 예외 발생)
+    """
+    if not raw_text:
+        raise ValueError("empty response")
+
+    text = raw_text
+
+    # 1) 코드블록 추출 (```json ... ``` 또는 ``` ... ```)
+    code_blocks = []
+    for m in re.finditer(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.S | re.I):
+        code_blocks.append(m.group(1))
+
+    if code_blocks:
+        # 가장 긴 블록을 선택
+        candidate = max(code_blocks, key=len)
+    else:
+        # 2) 중괄호 최외곽 블록 추출
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            candidate = text[start:end+1]
+        else:
+            # 실패
+            raise ValueError("no JSON object found in text")
+
+    # 3) 반복된 중괄호/템플릿 아티팩트 정리
+    # replace doubled braces that come from templating examples like '{{' '}}'
+    prev = None
+    cleaned = candidate
+    # 반복적으로 교정 (최대 3회)
+    for _ in range(3):
+        prev = cleaned
+        cleaned = cleaned.replace("{{", "{").replace("}}", "}")
+        cleaned = cleaned.replace("`", '"')
+        if cleaned == prev:
+            break
+
+    # 4) trailing commas 제거 (}, ] 형태)
+    cleaned = re.sub(r",(\s*[}\]])", r"\1", cleaned)
+
+    # 5) 시도적으로 작은 수정들 (예: 잘못된 True/False/null 대체) — 여기선 한국어/특이단어는 건드리지 않음
+
+    # 마지막으로 JSON 파싱 시도
+    parsed = json.loads(cleaned)
+    return parsed
+
 
 
 
@@ -823,63 +889,308 @@ def news_agent_node(state: MultiAgentState) -> MultiAgentState:
     }
 
 
+def _normalize_stock(raw_stock: Dict[str, Any], required_keys, optional_keys, key_aliases, issues: List[str]) -> Dict[str, Any]:
+    """Normalize a raw stock dict from LLM output into expected keys/types.
+    - apply alias mapping
+    - coerce common types (weight, amount, shares)
+    - record minor issues into the provided issues list
+    """
+    stock: Dict[str, Any] = {}
+
+    # map aliases
+    for k, v in raw_stock.items():
+        nk = key_aliases.get(k, k)
+        stock[nk] = v
+
+    # ensure required keys exist (may be filled later)
+    for k in list(required_keys) + list(optional_keys):
+        if k not in stock:
+            stock.setdefault(k, None)
+
+    # normalize weight: allow "30%" or 30 (percent) or 0.3
+    w = stock.get("weight")
+    if isinstance(w, str):
+        try:
+            if w.strip().endswith("%"):
+                stock["weight"] = float(w.strip().rstrip('%')) / 100.0
+            else:
+                stock["weight"] = float(w)
+        except Exception:
+            issues.append(f"weight_parse_failed:{stock.get('ticker')}")
+            stock["weight"] = None
+    else:
+        try:
+            if w is not None:
+                fw = float(w)
+                # if user supplied 30 meaning 30% -> convert when >1 and <=100
+                if fw > 1 and fw <= 100:
+                    fw = fw / 100.0
+                stock["weight"] = fw
+        except Exception:
+            if w is not None:
+                issues.append(f"invalid_weight_type:{stock.get('ticker')}")
+            stock["weight"] = None
+
+    # amount -> try int
+    amt = stock.get("amount")
+    if isinstance(amt, str):
+        try:
+            stock["amount"] = int(float(amt.replace(',', '')))
+        except Exception:
+            issues.append(f"amount_parse_failed:{stock.get('ticker')}")
+            stock["amount"] = None
+
+    # shares -> int when possible
+    sh = stock.get("shares")
+    if sh is not None and not isinstance(sh, int):
+        try:
+            stock["shares"] = int(float(sh))
+        except Exception:
+            # leave as-is (could be None or bad)
+            issues.append(f"shares_parse_failed:{stock.get('ticker')}")
+            stock["shares"] = None
+
+    return stock
+
+
+def _validate_performance_metrics(perf: Any, issues: List[str]):
+    if not isinstance(perf, dict):
+        issues.append("performance_metrics_missing_or_invalid")
+        return
+
+    expected_keys = ["expected_return", "max_drawdown", "sharpe_ratio", "benchmark_alpha"]
+    for k in expected_keys:
+        if k not in perf:
+            issues.append(f"performance_metrics_missing_key:{k}")
+        else:
+            try:
+                _ = float(perf.get(k))
+            except Exception:
+                issues.append(f"performance_metrics_not_numeric:{k}")
+
+
+def _validate_chart_data(chart: Any, issues: List[str]):
+    if not isinstance(chart, dict):
+        issues.append("chart_data_missing_or_invalid")
+        return
+
+    sunburst = chart.get("sunburst")
+    if sunburst is None:
+        issues.append("chart_data_sunburst_missing")
+    elif not isinstance(sunburst, list):
+        issues.append("chart_data_sunburst_not_list")
+    else:
+        names = set()
+        total_value = 0.0
+        for idx, node in enumerate(sunburst):
+            if not isinstance(node, dict):
+                issues.append(f"sunburst_item_not_object:{idx}")
+                continue
+            name = node.get("name")
+            val = node.get("value")
+            if name is None:
+                issues.append(f"sunburst_missing_name:{idx}")
+            else:
+                names.add(name)
+            try:
+                fv = float(val)
+                total_value += fv
+            except Exception:
+                issues.append(f"sunburst_value_not_numeric:{name or idx}")
+
+        # parent consistency
+        for node in sunburst:
+            if isinstance(node, dict):
+                parent = node.get("parent")
+                if parent and parent not in names:
+                    issues.append(f"sunburst_parent_missing:{parent}")
+
+    # expected_performance
+    exp_perf = chart.get("expected_performance") if isinstance(chart, dict) else None
+    if exp_perf is None:
+        issues.append("chart_expected_performance_missing")
+    else:
+        months = exp_perf.get("months")
+        portfolio_vals = exp_perf.get("portfolio")
+        benchmark_vals = exp_perf.get("benchmark")
+        if months != [1, 3, 6, 12]:
+            issues.append(f"expected_performance_months_invalid:{months}")
+        for label, arr in (("portfolio", portfolio_vals), ("benchmark", benchmark_vals)):
+            if not isinstance(arr, list) or len(arr) != 4:
+                issues.append(f"expected_performance_{label}_invalid_length")
+            else:
+                for i, v in enumerate(arr):
+                    try:
+                        float(v)
+                    except Exception:
+                        issues.append(f"expected_performance_{label}_not_numeric_idx:{i}")
+
+
+def _validate_portfolio_items(final_portfolio: List[Dict[str, Any]], issues: List[str]):
+    for s in final_portfolio:
+        ticker = s.get("ticker")
+        w = s.get("weight")
+        try:
+            if w is None:
+                issues.append(f"portfolio_weight_missing:{ticker}")
+            else:
+                fw = float(w)
+                if fw <= 0 or fw > 1:
+                    issues.append(f"portfolio_weight_out_of_range:{ticker}:{fw}")
+        except Exception:
+            issues.append(f"portfolio_weight_not_numeric:{ticker}")
+
+        scores = s.get("scores")
+        if isinstance(scores, dict):
+            for k, v in scores.items():
+                try:
+                    float(v)
+                except Exception:
+                    issues.append(f"score_not_numeric:{ticker}:{k}")
+
+
+
 def validation_node(state: MultiAgentState) -> MultiAgentState:
     """
     검증 노드: 최종 포트폴리오 데이터 검증 및 교정
-    - DB에 없는 ticker 제거
-    - ticker, name, sector를 DB 데이터로 강제 교체
-    - 현재가 정보 업데이트
     """
     print("\n" + "="*60)
     print("✅ [검증] 최종 포트폴리오 데이터 검증")
     print("="*60)
-    
+
     portfolio = state.get("portfolio_allocation", [])
     company_infos = state.get("company_infos", {})
     stock_prices = state.get("stock_prices", {})
-    
-    validated_portfolio = []
-    total_weight = 0.0
-    
-    for stock in portfolio:
+
+    required_keys = {"ticker", "name", "sector", "weight", "amount"}
+    optional_keys = {"shares", "current_price", "target_price", "stop_loss", "scores"}
+    key_aliases = {
+        "tickers": "ticker",
+        "company": "name",
+        "company_name": "name",
+        "sector_name": "sector",
+        "weight_pct": "weight",
+        "percent": "weight",
+        "allocation": "weight",
+        "value": "amount",
+        "price": "current_price",
+    }
+
+    validated_portfolio: List[Dict[str, Any]] = []
+    issues: List[str] = []
+    removed: List[str] = []
+
+    for raw_stock in portfolio:
+        stock = _normalize_stock(raw_stock.copy(), required_keys, optional_keys, key_aliases, issues)
         ticker = stock.get("ticker")
-        
-        # ticker가 DB에 존재하는지 확인
-        if ticker in company_infos:
-            # ✅ DB 데이터로 강제 교체
+
+        if isinstance(ticker, list) and ticker:
+            ticker = ticker[0]
             stock["ticker"] = ticker
-            stock["name"] = company_infos[ticker]["name"]
-            stock["sector"] = company_infos[ticker]["sector"]
-            
-            # 현재가 정보 업데이트
-            if ticker in stock_prices:
-                db_price = stock_prices[ticker].get("current_price")
-                if db_price:
-                    stock["current_price"] = db_price
-                    # 주식 수 재계산
-                    amount = stock.get("amount", 0)
-                    if amount > 0 and db_price > 0:
-                        stock["shares"] = int(amount / db_price)
-            
-            total_weight += stock.get("weight", 0)
-            validated_portfolio.append(stock)
-            print(f"  ✓ {ticker}: {stock['name']} (검증 완료)")
-        else:
-            print(f"  ⚠️ {ticker}: DB에 없는 종목 (제외됨)")
-    
-    # 가중치 합계 검증
-    if abs(total_weight - 1.0) > 0.05:
-        print(f"  ⚠️ 가중치 합계 오류: {total_weight:.2f} (조정 필요)")
-        # 가중치 정규화
-        if total_weight > 0:
-            for stock in validated_portfolio:
-                stock["weight"] = stock["weight"] / total_weight
-    
-    state["portfolio_allocation"] = validated_portfolio
-    
-    print(f"\n✅ 검증 완료: {len(validated_portfolio)}개 종목")
-    
-    return state
+
+        if not ticker or ticker not in company_infos:
+            removed.append(ticker or "<missing_ticker>")
+            issues.append(f"invalid_or_missing_ticker:{ticker}")
+            print(f"  ⚠️ {ticker}: DB에 없는 종목 또는 ticker 누락 (제외됨)")
+            continue
+
+        stock["ticker"] = ticker
+        stock["name"] = company_infos[ticker].get("name")
+        stock["sector"] = company_infos[ticker].get("sector")
+
+        if ticker in stock_prices:
+            db_price = stock_prices[ticker].get("current_price")
+            if db_price:
+                stock["current_price"] = db_price
+                amount = stock.get("amount", 0) or 0
+                try:
+                    if amount and db_price:
+                        stock["shares"] = int(float(amount) / float(db_price))
+                except Exception:
+                    issues.append(f"shares_calc_failed:{ticker}")
+
+        missing = [k for k in required_keys if k not in stock or stock.get(k) in (None, "")]
+        if missing:
+            issues.append(f"missing_keys_for_{ticker}:{missing}")
+
+        w = stock.get("weight")
+        try:
+            if w is not None:
+                stock["weight"] = float(w)
+        except Exception:
+            issues.append(f"invalid_weight_type:{ticker}")
+            stock["weight"] = 0.0
+
+        validated_portfolio.append(stock)
+        print(f"  ✓ {ticker}: {stock.get('name')} (검증 후보)")
+
+    sum_weights = sum([s.get("weight", 0) or 0 for s in validated_portfolio]) if validated_portfolio else 0
+    if sum_weights == 0 and validated_portfolio:
+        issues.append("sum_weights_zero_or_missing")
+    elif sum_weights > 0 and abs(sum_weights - 1.0) > 0.001:
+        for s in validated_portfolio:
+            if s.get("weight") is not None:
+                s["weight"] = float(s["weight"]) / float(sum_weights)
+
+    final_portfolio = [s for s in validated_portfolio if s.get("ticker") in company_infos]
+    if removed:
+        issues.append(f"removed_tickers:{removed}")
+
+    # 성패 판단
+    validation_passed = (
+        len(final_portfolio) > 0
+        and (sum([s.get("weight", 0) for s in final_portfolio]) > 0.01)
+        and (not any(k.startswith("missing_keys_for_") for k in issues))
+    )
+
+    # 추가 검증들
+    _validate_performance_metrics(state.get("performance_metrics", {}), issues)
+    _validate_chart_data(state.get("chart_data", {}), issues)
+    _validate_portfolio_items(final_portfolio, issues)
+
+    # ✅ attempts는 여기서만 증가시키고, diff로 반환
+    previous_attempts = int(state.get("validation_attempts", 0))
+    attempts = previous_attempts + 1
+
+    print(f"  🔁 validation_attempts (incremented unconditionally) -> {attempts}")
+
+    print(f"\n✅ 검증 완료: {len(final_portfolio)}개 종목")
+    if issues:
+        print(f"  ⚠️ 검증 이슈: {issues}")
+    print(f"  🔎 validation_passed={validation_passed}")
+
+    # 🔥 핵심: state를 mutate하지 않고, 변경된 값만 dict로 반환
+    return {
+        "portfolio_allocation": final_portfolio,
+        "validation_issues": issues,
+        "validation_passed": validation_passed,
+        "validation_attempts": attempts,
+    }
+
+
+
+def route_after_validation(state: MultiAgentState) -> str:
+    """
+    검증 결과에 따라 LangGraph 내부에서 흐름을 제어하는 결정 노드.
+    """
+    print("\n--- [Route After Validation] 검증 결과 확인 (router) ---")
+
+    max_retries = int(state.get("max_validation_retries", 2))
+
+    validation_passed = bool(state.get("validation_passed", False))
+    attempts = int(state.get("validation_attempts", 0))
+
+    if validation_passed:
+        print("  ✅ 검증 통과: 워크플로우 종료로 이동")
+        return "end"
+
+    if attempts <= max_retries:
+        print(f"  🔁 검증 실패 - 재시도 허용 (attempts={attempts}/{max_retries}) -> Supervisor 재실행")
+        return "retry"
+    else:
+        print(f"  ⚠️ 최대 재시도 초과 (attempts={attempts}) -> 종료")
+        return "end"
+
 
 
 def supervisor_node(state: MultiAgentState) -> MultiAgentState:
@@ -1031,48 +1342,30 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
     print("="*60 + "\n")
 
     
-    # JSON 파싱
+    # JSON 파싱 (견고한 추출기를 사용)
     try:
-        json_start = response_text.find("```json")
-        json_end = response_text.find("```", json_start + 7)
-        
-        if json_start != -1 and json_end != -1:
-            json_str = response_text[json_start+7:json_end].strip()
-        else:
-            json_str = response_text.strip()
-        
-        # JSON 정리
-        json_str_fixed = json_str.replace("'", '"')
-        json_str_fixed = json_str_fixed.replace("`", '"') 
-        json_str_fixed = re.sub(r',(\s*[}\]])', r'\1', json_str_fixed)
-        result = json.loads(json_str_fixed)  # JSON 파싱 시도
-        
+        result = parse_llm_json(response_text)
+
         state["ai_summary"] = result.get("ai_summary", "")
         state["portfolio_allocation"] = result.get("portfolio_allocation", [])
         state["performance_metrics"] = result.get("performance_metrics", {})
         state["chart_data"] = result.get("chart_data", {})
-        
+
         print(f"\n✅ Supervisor 분석 완료")
         print(f"  - 포트폴리오 생성: {len(state['portfolio_allocation'])}개 종목")
         print(f"  - 예상 수익률: {state['performance_metrics'].get('expected_return', 0)}%")
-        
-    except json.JSONDecodeError as e:
-        print(f"\n❌ JSON 파싱 오류: {e}")
-        print(f"파싱 시도한 문자열:\n{json_str_fixed[:200]}...")
-        
+
+    except Exception as e:
+        # parse_llm_json 또는 json.loads에서 발생한 모든 오류를 잡아내어 디버깅 메시지 기록
+        print(f"\n❌ JSON 파싱 오류 또는 추출 실패: {e}")
+        try:
+            snippet = response_text[:400].replace('\n', ' ')[:400]
+            print(f"파싱 시도한 원본 스니펫: {snippet}...")
+        except Exception:
+            pass
+
         # Fallback 처리
         state["ai_summary"] = "최종 포트폴리오 생성 실패 (JSON 파싱 오류)"
-        state["portfolio_allocation"] = []
-        state["performance_metrics"] = {}
-        state["chart_data"] = {}
-    
-    except Exception as e:
-        print(f"\n❌ 예상치 못한 오류: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Fallback 처리
-        state["ai_summary"] = f"최종 포트폴리오 생성 실패: {str(e)}"
         state["portfolio_allocation"] = []
         state["performance_metrics"] = {}
         state["chart_data"] = {}
@@ -1105,9 +1398,80 @@ def aggregator_node(state: MultiAgentState) -> MultiAgentState:
     LangGraph가 모든 전문가 노드 완료를 기다림 (barrier 역할)
     """
     print("\n" + "="*60)
-    print("🔄 [집계 노드] 3명의 전문가 분석 완료, Supervisor로 전달")
+    print("🔄 [집계 노드] 전문가 분석 결과 집계 중 (barrier 확인)")
     print("="*60)
-    return {}  # 상태 변경 없음, 단순 통과
+
+    # 전문가 결과가 상태에 채워졌는지 확인합니다
+    fin = state.get("financial_analysis")
+    tech = state.get("technical_analysis")
+    news = state.get("news_analysis")
+
+    flags = {
+        "financial": bool(fin),
+        "technical": bool(tech),
+        "news": bool(news),
+    }
+
+    all_ready = all(flags.values())
+
+    state["ready_flags"] = flags
+    state["all_ready"] = all_ready
+
+    if all_ready:
+        print(f"  ✓ 모든 전문가 완료: ready_flags={flags}")
+    else:
+        missing = [k for k, v in flags.items() if not v]
+        print(f"  ⏳ 아직 완료되지 않은 전문가: {missing} - 대기")
+
+    # LangGraph의 barrier 특성 상 이 노드는 모든 병렬 선행이 끝난 뒤 호출됩니다.
+    # 여기서는 명시적으로 준비 여부를 state에 기록하여 이후 노드에서 검사할 수 있도록 합니다.
+    return {"ready_flags": flags, "all_ready": all_ready}
+
+
+def hub_wait(state: MultiAgentState) -> MultiAgentState:
+    """
+    모든 전문가가 준비될 때까지 대기하는 노드
+    간단히 로그만 남기고 상태를 유지합니다.
+    """
+    print("\n" + "="*60)
+    print("⏸ [Hub Wait] 아직 모든 전문가가 준비되지 않았습니다. 대기합니다.")
+    print("="*60)
+    return {}
+
+
+def route_from_aggregator(state: MultiAgentState) -> str:
+    """
+    aggregator의 상태를 보고 supervisor로 진행할지(here: 'go_supervisor')
+    아니면 대기('wait')로 보낼지 결정합니다.
+    """
+    # race-condition을 피하기 위해, state의 all_ready 플래그 대신
+    # 실제 전문가 결과 필드의 존재/비어있음 여부로 판단합니다.
+    fin = state.get("financial_analysis")
+    tech = state.get("technical_analysis")
+    news = state.get("news_analysis")
+
+    fin_ready = bool(fin) and (not (isinstance(fin, dict) and len(fin) == 0))
+    tech_ready = bool(tech) and (not (isinstance(tech, dict) and len(tech) == 0))
+    news_ready = bool(news) and (not (isinstance(news, dict) and len(news) == 0))
+
+    if fin_ready and tech_ready and news_ready:
+        print(f"  ✓ route_from_aggregator: all experts ready (fin_ready={fin_ready}, tech_ready={tech_ready}, news_ready={news_ready})")
+        return "go_supervisor"
+
+    print(f"  ⏳ route_from_aggregator: not ready yet (fin_ready={fin_ready}, tech_ready={tech_ready}, news_ready={news_ready})")
+    return "wait"
+
+
+def aggregator_gate(state: MultiAgentState) -> MultiAgentState:
+    """
+    Aggregator가 반환한 state가 LangGraph에 병합된 뒤 호출되는 게이트 노드.
+    실질적인 처리는 하지 않고, 병합된 최신 state를 통해 conditional routing이
+    안전하게 평가되도록 하는 역할을 합니다.
+    """
+    print("\n" + "="*60)
+    print("🔐 [Aggregator Gate] 병합된 상태 확인, 다음 단계로 라우팅 준비")
+    print("="*60)
+    return {}
 
 
 def build_multi_agent_graph():
@@ -1151,14 +1515,34 @@ def build_multi_agent_graph():
     graph.add_edge("technical_agent", "aggregator")
     graph.add_edge("news_agent", "aggregator")
     
-    # ⭐ aggregator → supervisor (1번만 실행!)
-    graph.add_edge("aggregator", "supervisor")
+    # ⭐ aggregator -> aggregator_gate -> conditional routing (안정화)
+    # aggregator에서 반환한 상태가 LangGraph에 병합된 뒤에 조건 분기를 평가하도록
+    # 중간 게이트 노드를 둡니다. 이로써 race/타이밍 이슈로 인해 잘못된 분기로
+    # 빠지는 것을 방지합니다.
+    graph.add_node("hub_wait", hub_wait)
+    graph.add_node("aggregator_gate", aggregator_gate)
+    graph.add_edge("aggregator", "aggregator_gate")
+    graph.add_conditional_edges(
+        "aggregator_gate",
+        route_from_aggregator,
+        {
+            "go_supervisor": "supervisor",
+            "wait": "hub_wait",
+        },
+    )
     
     # Supervisor 완료 후 검증
-    graph.add_edge("supervisor", "validation")  # ⭐ 수정
-    
-    # 검증 완료 후 종료
-    graph.add_edge("validation", END)  # ⭐ 추가
+    graph.add_edge("supervisor", "validation")  # Supervisor 완료 후 검증
+
+    # 검증 후 라우터로 분기 (validation 결과에 따라 supervisor로 재실행하거나 종료)
+    graph.add_conditional_edges(
+        "validation",
+        route_after_validation,
+        {
+            "retry": "supervisor",  # 재시도 -> supervisor로 돌아감
+            "end": END               # 종료
+        }
+    )
     
     return graph.compile()
 
@@ -1216,12 +1600,21 @@ def run_multi_agent_portfolio(
         "ai_summary": "",
         
         "messages": [],
-        "iteration": 0
+        "iteration": 0,
+
+        # validation 초기 상태
+        "validation_attempts": 0,
+        "validation_passed": False,
+        "validation_issues": [],
+        # 최대 재시도 횟수 (초기값 — 필요시 환경변수로 오버라이드 가능)
+        "max_validation_retries": 2,
     }
+
     
+    # LangGraph 내부에서 validation_decision_node가 재시도/종료를 제어하므로
+    # 여기서는 단순히 graph.invoke 결과를 사용합니다.
     final_state = graph.invoke(initial_state)
-    
-    
+
     import json
     print("\n====== 최종 API 응답 JSON ======")
     print(json.dumps({
@@ -1230,22 +1623,25 @@ def run_multi_agent_portfolio(
         "portfolio_allocation": final_state.get("portfolio_allocation"),
         "performance_metrics": final_state.get("performance_metrics"),
         "chart_data": final_state.get("chart_data"),
-        "discussion_history": final_state.get("discussion_history")
+        "discussion_history": final_state.get("discussion_history"),
+        "validation_passed": final_state.get("validation_passed", True),
+        "validation_issues": final_state.get("validation_issues", [])
     }, ensure_ascii=False, indent=2))
     print("================================\n")
-
 
     print(f"\n{'='*60}")
     print(f"✅ 멀티 에이전트 분석 완료!")
     print(f"{'='*60}\n")
-    
+
     return {
         "success": True,
         "ai_summary": final_state.get("ai_summary"),
         "portfolio_allocation": final_state.get("portfolio_allocation"),
         "performance_metrics": final_state.get("performance_metrics"),
         "chart_data": final_state.get("chart_data"),
-        "discussion_history": final_state.get("discussion_history")
+        "discussion_history": final_state.get("discussion_history"),
+        "validation_passed": final_state.get("validation_passed", True),
+        "validation_issues": final_state.get("validation_issues", [])
     }
 
 
