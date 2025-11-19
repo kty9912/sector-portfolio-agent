@@ -1,0 +1,55 @@
+pipeline:
+  deploy:
+    image: docker:27
+    pull: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/opc/financial-strategy-agent:/deploy
+    when:
+      event:
+        - push
+      branch:
+        - main
+    commands:
+      - apk add --no-cache bash
+
+      # 컬러 정의
+      - GREEN='\033[0;32m'
+      - YELLOW='\033[1;33m'
+      - RED='\033[0;31m'
+      - BLUE='\033[0;34m'
+      - NC='\033[0m'
+
+      - echo -e "${BLUE}[STEP]--------------------------------------------${NC}"
+      - echo -e "${BLUE}[STEP] Woodpecker 작업공간 → 실제 배포 디렉토리 복사${NC}"
+
+      # 1. 코드 복사
+      - rm -rf /deploy/*
+      - cp -r /woodpecker/src/* /deploy/
+      - echo -e "${GREEN}[INFO] 코드 복사 완료${NC}"
+
+      - echo -e "${BLUE}[STEP]--------------------------------------------${NC}"
+      - echo -e "${BLUE}[STEP] 기존 컨테이너 중지 + 삭제${NC}"
+
+      - docker stop fin-agent-app || true
+      - docker rm fin-agent-app || true
+      - echo -e "${GREEN}[INFO] 컨테이너 정리 완료${NC}"
+
+      - echo -e "${BLUE}[STEP]--------------------------------------------${NC}"
+      - echo -e "${BLUE}[STEP] Docker 이미지 빌드${NC}"
+
+      - cd /deploy
+      - docker build -t fin-agent-app .
+      - echo -e "${GREEN}[INFO] 이미지 빌드 완료${NC}"
+
+      - echo -e "${BLUE}[STEP]--------------------------------------------${NC}"
+      - echo -e "${BLUE}[STEP] 새 컨테이너 실행${NC}"
+
+      - docker run -d --name fin-agent-app \
+          --network fin-net \
+          -p 8000:8000 \
+          --env-file /deploy/.env \
+          fin-agent-app
+
+      - echo -e "${GREEN}[DONE] 배포 완료!${NC}"
+      - docker ps | grep fin-agent-app
