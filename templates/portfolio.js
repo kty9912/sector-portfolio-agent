@@ -299,7 +299,7 @@ document.getElementById('portfolioForm').addEventListener('submit', async (e) =>
         : '/api/analyze/anthropic';
     
     const requestData = {
-        budget: parseInt(formData.get('budget')),
+        budget: parseInt(formData.get('budget')?.replace(/,/g, '') || '0'),
         investment_targets: {
             sectors: selectedSectors,
             tickers: selectedStocks
