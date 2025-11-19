@@ -18,6 +18,10 @@ COPY pyproject.toml uv.lock ./
 # uv로 의존성 설치 (프로젝트용 가상환경 자동 생성)
 RUN uv sync --frozen --no-dev
 
+# 👉 Playwright 브라우저(Chromium) + 필요한 시스템 deps 설치
+# uv가 만든 venv는 /app/.venv 이라서, 그 안의 playwright 바이너리를 직접 실행
+RUN /app/.venv/bin/playwright install --with-deps chromium
+
 # 나머지 코드 전부 복사
 COPY . .
 
