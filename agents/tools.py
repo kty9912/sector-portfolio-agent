@@ -181,10 +181,30 @@ def search_realtime_news_tavily(query: str) -> List[Dict]:
                                    time_range='month'
                                    )
         results = tavily_tool.invoke({'query': "{}의 최신 뉴스를 검색하고 요약합니다. '최신 속보'나 '오늘 동향'에 사용합니다.".format(query)})
-        print(f"[Agent 5 Tool - Tavily] 실시간 검색 완료. {len(results)}개 결과 반환.")
-        return results # (이미 요약된 내용과 출처 URL이 포함된 dict 리스트)
+        if isinstance(results, dict):
+            if "results" in results:
+                items = results["results"]
+            elif "data" in results:
+                items = results["data"]
+            else:
+                items = []
+        elif isinstance(results, list):
+            items = results
+        elif isinstance(results, str):
+            # 예외적으로 문자열 반환 시 빈 리스트 처리
+            print(f"[Agent 5 Tool - Tavily] 문자열 결과: {results[:100]} ... 결과 무시하고 빈 리스트 반환")
+            items = []
+        else:
+            # 기타 타입이면 빈 리스트 처리
+            print(f"[Agent 5 Tool - Tavily] 예상치 못한 반환 타입: {type(results)}")
+            items = []
+
+        print(f"[Agent 5 Tool - Tavily] 뉴스 개수: {len(items)}")
+        return items
+
     except Exception as e:
-        return [{"error": str(e)}]
+        print(f"[Agent 5 Tool - Tavily] 검색 실패: {str(e)}")
+        return []
 
 @tool
 def search_sector_news_qdrant(sector_name: str) -> dict:
