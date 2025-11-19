@@ -3,9 +3,10 @@ steps:
     image: docker:27
     pull: true
 
-    # 🔥 호스트 Docker 데몬 붙이기
+    # 🔥 호스트 Docker 데몬 + .env 파일을 컨테이너로 마운트
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /home/opc/financial-strategy-agent/.env:/run/fin-agent.env:ro
 
     when:
       event:
@@ -29,13 +30,13 @@ steps:
       - docker rm fin-agent-app || true
       - echo -e "\033[0;32m[INFO] 기존 컨테이너 정리 완료\033[0m"
 
-      # 2. 이미지 빌드 (지금 디렉토리: /woodpecker/src/…/financial-strategy-agent)
+      # 2. 이미지 빌드
       - echo -e "\033[1;34m[STEP] Docker 이미지 빌드 시작\033[0m"
       - docker build -t fin-agent-app .
 
       # 3. 새 컨테이너 실행
       - echo -e "\033[1;34m[STEP] 새 컨테이너 실행\033[0m"
-      - docker run -d --name fin-agent-app --network fin-net -p 8000:8000 --env-file /woodpecker/src/dev.wyhil.com/SG-OHIA-2025-TEAM-03/financial-strategy-agent/.env fin-agent-app
+      - docker run -d --name fin-agent-app --network fin-net -p 8000:8000 --env-file /run/fin-agent.env fin-agent-app
 
       - echo -e "\033[0;32m[SUCCESS] 배포 완료!\033[0m"
       - docker ps | grep fin-agent-app || true
