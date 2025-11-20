@@ -21,6 +21,9 @@ from agents.stock_agent_anthropic import run_stock_analysis_agent
 from agents.stock_agent_langgraph import run_langgraph_stock_analysis
 from core.llm_clients import AVAILABLE_MODELS
 
+import sys
+sys.stdout.reconfigure(line_buffering=True)
+
 app = FastAPI(title="AI 투자 포트폴리오 분석 시스템 v2")
 
 # 정적 파일 (CSS, JS) 서빙 설정
