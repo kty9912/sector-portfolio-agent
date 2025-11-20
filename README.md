@@ -1,24 +1,3 @@
-<p align="center">
-
-  <!-- Language & Framework -->
-  <img src="https://img.shields.io/badge/Python-3.9.21-26a69a?logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/FastAPI-Framework-26a69a?logo=fastapi&logoColor=white" />
-
-  <!-- LLM Providers -->
-  <img src="https://img.shields.io/badge/OpenAI-gpt--4o--mini-26a69a?logo=openai&logoColor=white" />
-  <img src="https://img.shields.io/badge/Solar-Pro_2-26a69a?logo=sun&logoColor=white" />
-  <img src="https://img.shields.io/badge/Groq-LLM-26a69a?logo=lightning&logoColor=white" />
-
-  <!-- Databases -->
-  <img src="https://img.shields.io/badge/PostgreSQL-DB-26a69a?logo=postgresql&logoColor=white" />
-  <img src="https://img.shields.io/badge/Qdrant-VectorDB-26a69a?logo=qdrant&logoColor=white" />
-
-  <!-- Infra & Deployment -->
-  <img src="https://img.shields.io/badge/Docker-Containerized-26a69a?logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/Oracle_Cloud-OCI-26a69a?logo=oracle&logoColor=white" />
-  <img src="https://img.shields.io/badge/Woodpecker-CI/CD-26a69a?logo=githubactions&logoColor=white" />
-
-</p>
 
 # 금융 투자 전략 AI Agent  
 AI 기반 멀티 에이전트 시스템으로 **포트폴리오 구성**, **기업 분석**, **투자 전략 생성**을 자동화하는 프로젝트입니다.
@@ -26,6 +5,23 @@ AI 기반 멀티 에이전트 시스템으로 **포트폴리오 구성**, **기�
 본 시스템은 재무·기술·뉴스 데이터를 통합 분석하여, 단순 지표 제공을 넘어서 **신뢰도 높은 투자 전략**을 산출하도록 설계되었습니다.
 
 ---
+<p align="center">
+
+  <img src="https://img.shields.io/badge/Python-3.9.21-26a69a?style=for-the-badge&logo=python&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/FastAPI-Framework-26a69a?style=for-the-badge&logo=fastapi&logoColor=white&labelColor=37474f" />
+
+  <img src="https://img.shields.io/badge/OpenAI-gpt--4o--mini-26a69a?style=for-the-badge&logo=openai&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Solar-Pro_2-26a69a?style=for-the-badge&logo=sun&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Groq-LLM-26a69a?style=for-the-badge&logo=lightning&logoColor=white&labelColor=37474f" />
+
+  <img src="https://img.shields.io/badge/PostgreSQL-DB-26a69a?style=for-the-badge&logo=postgresql&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Qdrant-VectorDB-26a69a?style=for-the-badge&logo=qdrant&logoColor=white&labelColor=37474f" />
+
+  <img src="https://img.shields.io/badge/Docker-Containerized-26a69a?style=for-the-badge&logo=docker&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Oracle_Cloud-OCI-26a69a?style=for-the-badge&logo=oracle&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Woodpecker-CI/CD-26a69a?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=37474f" />
+
+</p>
 
 ## 프로젝트 개요
 
