@@ -67,7 +67,8 @@ def get_chat_model(model_name: str) -> BaseChatModel:
         return ChatOpenAI(
             model=model_name,
             api_key=UPSTAGE_API_KEY,
-            base_url="https://api.upstage.ai/v1"
+            base_url="https://api.upstage.ai/v1",
+            temperature=0.1
         )
     
     elif model_name == OPENAI_MODEL_NAME and OPENAI_API_KEY:
@@ -76,7 +77,8 @@ def get_chat_model(model_name: str) -> BaseChatModel:
         print(f"--- [LLM Factory] OpenAI '{model_name}' 모델을 로드합니다. ---")
         return ChatOpenAI(
             model=model_name,
-            api_key=OPENAI_API_KEY
+            api_key=OPENAI_API_KEY,
+            temperature=0.1
         )
         
     elif model_name == GEMINI_MODEL_NAME and GOOGLE_API_KEY:
@@ -85,7 +87,9 @@ def get_chat_model(model_name: str) -> BaseChatModel:
         print(f"--- [LLM Factory] Google '{model_name}' 모델을 로드합니다. ---")
         return ChatGoogleGenerativeAI(
             model=model_name,
-            google_api_key=GOOGLE_API_KEY
+            google_api_key=GOOGLE_API_KEY,
+            convert_system_message_to_human=True,
+            temperature=0.1
         )
         
     elif model_name == GROQ_MODEL_NAME and GROQ_API_KEY:
@@ -94,7 +98,8 @@ def get_chat_model(model_name: str) -> BaseChatModel:
         print(f"--- [LLM Factory] Groq '{model_name}' 모델을 로드합니다. ---")
         return ChatGroq(
             model_name=model_name,
-            groq_api_key=GROQ_API_KEY
+            groq_api_key=GROQ_API_KEY,
+            temperature=0.1
         )
     
     else:
