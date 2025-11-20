@@ -1,0 +1,13 @@
+{
+  "af8bf3aa45883c51686e606b3d8662b7": {
+    "sentiment": "positive",
+    "sentiment_score": 0.999864935874939,
+    "sentiment_confidence": 0.999864935874939,
+    "method": "finbert-kr",
+    "scores": {
+      "negative": 3.658216883195564e-05,
+      "neutral": 9.840413986239582e-05,
+      "positive": 0.999864935874939
+    }
+  }
+}
