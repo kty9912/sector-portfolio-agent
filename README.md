@@ -1,11 +1,33 @@
-# 📈 금융 투자 전략 AI Agent  
+<p align="center">
+
+  <!-- Language & Framework -->
+  <img src="https://img.shields.io/badge/Python-3.9.21-26a69a?logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-Framework-26a69a?logo=fastapi&logoColor=white" />
+
+  <!-- LLM Providers -->
+  <img src="https://img.shields.io/badge/OpenAI-gpt--4o--mini-26a69a?logo=openai&logoColor=white" />
+  <img src="https://img.shields.io/badge/Solar-Pro_2-26a69a?logo=sun&logoColor=white" />
+  <img src="https://img.shields.io/badge/Groq-LLM-26a69a?logo=lightning&logoColor=white" />
+
+  <!-- Databases -->
+  <img src="https://img.shields.io/badge/PostgreSQL-DB-26a69a?logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Qdrant-VectorDB-26a69a?logo=qdrant&logoColor=white" />
+
+  <!-- Infra & Deployment -->
+  <img src="https://img.shields.io/badge/Docker-Containerized-26a69a?logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/Oracle_Cloud-OCI-26a69a?logo=oracle&logoColor=white" />
+  <img src="https://img.shields.io/badge/Woodpecker-CI/CD-26a69a?logo=githubactions&logoColor=white" />
+
+</p>
+
+# 금융 투자 전략 AI Agent  
 AI 기반 멀티 에이전트 시스템으로 **포트폴리오 구성**, **기업 분석**, **투자 전략 생성**을 자동화하는 프로젝트입니다.
 
 본 시스템은 재무·기술·뉴스 데이터를 통합 분석하여, 단순 지표 제공을 넘어서 **신뢰도 높은 투자 전략**을 산출하도록 설계되었습니다.
 
 ---
 
-## 🚀 프로젝트 개요
+## 프로젝트 개요
 
 **금융 투자 전략 AI Agent**는  
 실시간 시장 데이터(시세, 재무, 뉴스)를 다각도로 분석하여  
@@ -19,9 +41,9 @@ AI 기반 멀티 에이전트 시스템으로 **포트폴리오 구성**, **기�
 
 ---
 
-## 🧠 핵심 기능
+## 핵심 기능
 
-### 1) ⭐ **포트폴리오 구성 서비스**
+### 1) **포트폴리오 구성 서비스**
 사용자 입력:
 - 엔진 선택 (Anthropic / LangGraph)
 - LLM 모델 선택 (OpenAI / Solar Pro 2 / Groq)
@@ -39,7 +61,7 @@ AI 기반 멀티 에이전트 시스템으로 **포트폴리오 구성**, **기�
 
 ---
 
-### 2) ⭐ **기업 분석 서비스**
+### 2) **기업 분석 서비스**
 입력:
 - 엔진 선택
 - LLM 모델 선택
@@ -63,7 +85,7 @@ AI 기반 멀티 에이전트 시스템으로 **포트폴리오 구성**, **기�
 
 ---
 
-## 🏗️ 시스템 아키텍처 개요
+## 시스템 아키텍처 개요
 
 ### 주요 구성 요소
 - **FastAPI** 기반 백엔드 API
@@ -78,7 +100,7 @@ AI 기반 멀티 에이전트 시스템으로 **포트폴리오 구성**, **기�
 
 ---
 
-## 📂 폴더 구조
+## 폴더 구조
 ```
 financial-strategy-agent
 ├── agents
@@ -122,7 +144,7 @@ financial-strategy-agent
 
 ---
 
-## ⚙️ 실행 방법
+## 실행 방법
 
 ### ▶ 로컬 실행
 
@@ -134,7 +156,7 @@ financial-strategy-agent
 
 ---
 
-## 🔑 환경 변수
+## 환경 변수
 ```
 다음 환경 변수가 필요합니다:
 
@@ -162,7 +184,7 @@ GROQ_API_KEY
 
 ---
 
-## 🐳 Docker / 배포 구조
+## Docker / 배포 구조
 
 - 배포 환경: **Oracle Cloud(OCI)**
 - 백엔드 서비스와 Postgres는 **개별 Docker 이미지**로 실행
@@ -171,7 +193,7 @@ GROQ_API_KEY
 
 ---
 
-## 🧪 테스트
+## 테스트
 
 테스트 코드는 `experiments/` 디렉토리 내에 위치하며, 다음 항목들을 중심으로 작성 중입니다.
 
@@ -197,7 +219,7 @@ GROQ_API_KEY
 
 ---
 
-## 📞 문의 / 개발자 정보
+## 문의 / 개발자 정보
 
 - 개발: 용신 ( 김태용, 신도희 )
 - 목적: 교육/연구/프로토타입 개발용
