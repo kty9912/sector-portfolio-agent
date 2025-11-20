@@ -45,7 +45,7 @@
         <!-- 기능 카드 -->
         <div class="feature-grid">
             <div class="feature-card" onclick="location.href='/portfolio'">
-                <div class="feature-icon">📊</div>
+                <div class="feature-icon"><i data-feather="bar-chart-2"></i></div>
                 <div class="feature-title">포트폴리오 분석</div>
                 <div class="feature-description">
                     투자 성향과 목표에 맞는 최적의 포트폴리오를 구성합니다.
@@ -61,7 +61,7 @@
             </div>
             
             <div class="feature-card" onclick="location.href='/stock'">
-                <div class="feature-icon">📈</div>
+                <div class="feature-icon"><i data-feather="trending-up"></i></div>
                 <div class="feature-title">종목 분석</div>
                 <div class="feature-description">
                     개별 종목에 대한 심층 분석과 투자 의견을 제공합니다.
@@ -100,6 +100,25 @@
                 }, index * 150);
             });
         });
+    </script>
+    <!-- Feather Icons (CDN) - line/outline icons loaded via URL -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script>
+        // Replace <i data-feather> with SVGs. Works whether DOMContentLoaded fired or not.
+        function replaceFeather() {
+            if (window.feather && typeof window.feather.replace === 'function') {
+                try {
+                    window.feather.replace();
+                } catch (e) {
+                    console.warn('feather.replace() failed', e);
+                }
+            }
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', replaceFeather);
+        } else {
+            replaceFeather();
+        }
     </script>
 </body>
 </html>

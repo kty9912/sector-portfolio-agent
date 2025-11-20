@@ -175,8 +175,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2.5em;
-    margin-bottom: 25px;
+    font-size: 0; /* prevent fallback emoji sizing */
+    margin-bottom: 20px;
     box-shadow: 0 8px 20px rgba(var(--brand-point-rgb), 0.3);
 }
 
@@ -347,4 +347,30 @@ body {
     .market-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Feather icons: target injected SVGs directly (feather.replace removes the <i> tag)
+   Ensure white outline, larger size, and that all paths inherit the stroke */
+.feature-icon {
+    /* provide a fallback color so SVGs that use currentColor render white */
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 75px;
+    height: 75px;
+}
+.feature-icon svg {
+    width: 56px !important;
+    height: 56px !important;
+    display: block;
+    stroke: #ffffff;
+    fill: none !important;
+    stroke-width: 2 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+}
+.feature-icon svg * {
+    stroke: inherit !important;
+    fill: none !important;
 }
