@@ -199,6 +199,13 @@ def search_realtime_news_tavily(query: str) -> List[Dict]:
             print(f"[Agent 5 Tool - Tavily] 예상치 못한 반환 타입: {type(results)}")
             items = []
 
+        # 리스트 타입 데이터에 대한 추가 처리
+        for item in items:
+            if isinstance(item, list):
+                print(f"⚠️ Tavily 결과가 리스트로 반환됨: {item}")
+                # 리스트를 문자열로 변환하거나 필요한 처리를 수행
+                item = " ".join(map(str, item))
+
         print(f"[Agent 5 Tool - Tavily] 뉴스 개수: {len(items)}")
         return items
 
