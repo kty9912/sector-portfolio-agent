@@ -1,117 +1,224 @@
-document.body.appendChild(form);
 
-# Sector Portfolio Agent (간단판)
+# 금융 투자 전략 AI Agent  
+AI 기반 멀티 에이전트 시스템으로 **포트폴리오 구성**, **기업 분석**, **투자 전략 생성**을 자동화하는 프로젝트입니다.
 
-간단한 소개
+본 시스템은 재무·기술·뉴스 데이터를 통합 분석하여, 단순 지표 제공을 넘어서 **신뢰도 높은 투자 전략**을 산출하도록 설계되었습니다.
 
-AI 기반 섹터/종목 분석 및 포트폴리오 구성 연구용 프로젝트입니다. FastAPI 백엔드와 몇 가지 LLM 클라이언트(OpenAI/Anthropic 등)를 사용하며, Docker로 컨테이너화해 배포할 수 있습니다.
+---
+<p align="center">
 
-핵심: 로컬 개발 빠른 시작(Quickstart), 환경변수(.env)로 API 키 관리, Docker 이미지로 배포.
+  <img src="https://img.shields.io/badge/Python-3.9.21-26a69a?style=for-the-badge&logo=python&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/FastAPI-Framework-26a69a?style=for-the-badge&logo=fastapi&logoColor=white&labelColor=37474f" />
 
-## 빠른 시작 (Quickstart)
+  <img src="https://img.shields.io/badge/OpenAI-gpt--4o--mini-26a69a?style=for-the-badge&logo=openai&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Solar-Pro_2-26a69a?style=for-the-badge&logo=sun&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Groq-LLM-26a69a?style=for-the-badge&logo=lightning&logoColor=white&labelColor=37474f" />
 
-Windows 개발(예)
+  <img src="https://img.shields.io/badge/PostgreSQL-DB-26a69a?style=for-the-badge&logo=postgresql&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Qdrant-VectorDB-26a69a?style=for-the-badge&logo=qdrant&logoColor=white&labelColor=37474f" />
 
-1) 가상환경 생성 및 활성화
+  <img src="https://img.shields.io/badge/Docker-Containerized-26a69a?style=for-the-badge&logo=docker&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Oracle_Cloud-OCI-26a69a?style=for-the-badge&logo=oracle&logoColor=white&labelColor=37474f" />
+  <img src="https://img.shields.io/badge/Woodpecker-CI/CD-26a69a?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=37474f" />
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
+</p>
 
-2) 의존성 설치
+## 프로젝트 개요
 
-```powershell
-python -m pip install --upgrade pip
-pip install -e .
-```
+**금융 투자 전략 AI Agent**는  
+실시간 시장 데이터(시세, 재무, 뉴스)를 다각도로 분석하여  
+사용자에게 **정교한 포트폴리오 추천**과 **기업 분석 기반 투자 전략**을 제공하는 멀티 에이전트 기반 서비스입니다.
 
-3) 개발 서버 실행
-
-```powershell
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-브라우저: http://localhost:8000
-
-## 환경 변수
-
-프로젝트 루트에 `.env` 파일을 만들되, 실제 키는 절대 저장소에 커밋하지 마세요. 대신 `.env.example`에 필요한 키 이름만 둡니다.
-
-예시(`.env.example`에 넣을 내용):
-
-```
-OPENAI_API_KEY=YOUR_OPENAI_API_KEY
-ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY
-DATABASE_URL=postgresql://<USER>:<PASSWORD>@<HOST>:5432/<DBNAME>
-QDRANT_URL=http://localhost:6333
-REDIS_URL=redis://localhost:6379
-```
-
-.gitignore에 `.env`가 포함되어 있는지 확인하세요(현재 포함되어 있음).
-
-## Docker (요약)
-
-빌드:
-
-```powershell
-docker build -t fin-agent-app .
-```
-
-실행(권장: 비밀 관리는 Docker secrets 또는 클라우드 시크릿 매니저 사용):
-
-```powershell
-docker run -d --name fin-agent-app -p 8000:8000 --env-file .env --restart unless-stopped fin-agent-app
-```
-
-컨테이너에서 프로덕션으로 서비스를 운용할 때는 `uvicorn`/`gunicorn` CLI로 앱을 실행하는 것을 권장합니다. 예:
-
-```powershell
-# 개발
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-# 프로덕션(예)
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
-```
-
-설명: README 내에 `uv`(일부 환경에서 dependency sync/lock을 위한 도구로 사용됨) 관련 내용이 혼재되어 있어 혼동이 발생했습니다. 이 프로젝트에서 런타임으로는 `uvicorn`을 사용하고 있으며, `uv` CLI는 선택적(의존성 동기화)입니다. 따라서 README에서는 `uv` 사용을 선택적 섹션으로 분리하거나 제거하는 것이 명확합니다.
-
-## 간단한 배치/잡 실행
-
-직접 실행(로컬 또는 컨테이너 내부):
-
-```powershell
-python -m jobs.seed_companies
-python -m jobs.load_prices_daily
-python -m jobs.calc_signals_latest
-```
-
-Docker에서 실행할 때는 `/app/.venv/bin/python -m jobs.<name>` 형식으로 실행하도록 이미지를 구성해 두었습니다.
-
-## 보안 체크리스트 (중요)
-
-- README나 코드에 민감한 값(실제 API 키, DB 비밀번호)을 남기지 마세요. 항상 placeholder 사용.
-- `.env`는 버전관리에서 제외되어야 합니다(.gitignore에 추가되어 있음).
-- 로그에 API 키나 전체 토큰을 출력하지 마세요. (예: `core/llm_clients.py`의 `print` 디버그 상태를 로거의 debug로 변경 권장)
-- 배포 환경에서는 Docker secrets, Kubernetes Secrets, 또는 클라우드 제공자의 Secret Manager 사용을 권장합니다.
-- 만약 키가 깃에 유출되었다면 즉시 회수(rotate)하세요.
-
-## `uv` / `uvicorn` 관련 요약
-
-- `uvicorn`은 ASGI 서버로 개발 및 프로덕션에서 흔히 사용됩니다.
-- `uv`는 (이 레포에 존재하는) 잠금/동기화 도구로 보이며, 런타임 서버 역할을 하는 것은 아닙니다. `uv` 관련 명령을 사용하려면 문서에 "선택적"으로만 기재하세요.
-- 권장 실행 방식: CLI(`uvicorn ...`)로 실행하거나, 컨테이너에서 `gunicorn -k uvicorn.workers.UvicornWorker`를 사용하는 것이 일반적입니다.
-
-## 기여 및 라이선스
-
-- 이슈/PR 환영합니다. 코드 변경 시 테스트 추가를 권장합니다.
-- 라이선스/기여 규칙은 `LICENSE`, `CONTRIBUTING.md`에 별도 기재하세요.
-
-## 변경 기록 (요약)
-
-- v0.2.0: OCI+Docker 배포 문서화, 이미지 최적화, 배치 작업 추가
-- v0.1.0: 초기 작성
+- 멀티 에이전트 구조 (재무·기술·뉴스·통합 분석 전문가)
+- LangGraph / Anthropic 방식 모두 지원
+- HTML/CSS/JS 사용자 인터페이스
+- Postgres + Qdrant 기반 데이터 저장 및 검색
+- CI/CD 자동화 및 Docker 기반 배포
 
 ---
 
-간단 정리본을 적용했습니다. 자세한 원본 문서는 필요 시 보존하거나, README에 "상세 가이드" 링크로 연결하는 것을 권장합니다.
+## 핵심 기능
+
+### 1) **포트폴리오 구성 서비스**
+사용자 입력:
+- 엔진 선택 (Anthropic / LangGraph)
+- LLM 모델 선택 (OpenAI / Solar Pro 2 / Groq)
+- 투자 예산
+- 선호 섹터 / 종목
+- 투자 성향
+- 투자 기간
+
+출력 기능:
+- 최적 포트폴리오 구성 비율
+- 각 종목에 대한 3대 전문가 의견(재무/뉴스/데이터 분석)
+- AI 기반 종합 평가
+- Sunburst 차트 & 예상 수익률 그래프
+- PDF 다운로드
+
+---
+
+### 2) **기업 분석 서비스**
+입력:
+- 엔진 선택
+- LLM 모델 선택
+- 종목(기업)
+- 투자 성향
+- 투자 기간
+
+출력:
+- 종합 점수 (재무/기술/뉴스 종합)
+- 시장 현황 및 수익률 추세
+- 기술적 지표 (RSI, MA, 모멘텀, 변동성 등)
+- 재무 분석 (성장성·수익성·건전성)
+- 벨류에이션 비교
+- 시나리오 분석 (강세/중립/약세)
+- 뉴스 감성 분석
+- 투자 포인트 및 리스크 요약
+- 매수/매도 힌트, 지지/저항 구간
+- PDF 다운로드
+
+(예시는 `/templates/stock.html` 및 산출된 PDF 참조)
+
+---
+
+## 시스템 아키텍처 개요
+
+### 주요 구성 요소
+- **FastAPI** 기반 백엔드 API
+- **템플릿 기반 HTML/CSS/JS 프론트엔드**
+- **Postgres**: 가격·재무·시그널 저장
+- **Qdrant**: 뉴스 벡터 저장 및 검색
+- **OpenAI, Solar Pro 2, Groq** LLM 지원
+- **LangGraph 기반 Multi-Agent Workflow**
+- **Docker 기반 컨테이너 운영**
+- **Oracle Cloud(OCI)** 배포
+- **Woodpecker CI/CD** 자동화
+
+---
+
+## 폴더 구조
+```
+financial-strategy-agent
+├── agents
+│ ├── portfolio_agent_anthropic.py
+│ ├── portfolio_agent_multi.py
+│ ├── sentiment_analyzer.py
+│ ├── stock_agent_anthropic.py
+│ ├── stock_agent_langgraph.py
+│ └── tools.py
+│
+├── core
+│ ├── db.py
+│ ├── graph_builder.py
+│ ├── llm_clients.py
+│ └── vector_db.py
+│
+├── experiments
+│ └── test_llm_factory.py
+│
+├── jobs
+│ ├── calc_signals_latest.py
+│ ├── load_fundamentals.py
+│ ├── load_prices_daily.py
+│ ├── model_download.py
+│ └── seed_companies.py
+│
+├── templates
+│ ├── index.html / index.css
+│ ├── portfolio.html / portfolio.css / portfolio.js
+│ ├── stock.html / stock.css / stock.js
+│
+├── main.py
+├── Dockerfile
+├── .dockerignore
+├── .gitignore
+├── pyproject.toml
+├── uv.lock
+├── .woodpecker.yml
+└── .venv
+```
+
+---
+
+## 실행 방법
+
+### ▶ 로컬 실행
+
+`uv run python -m main`
+
+또는
+
+`python -m main`
+
+---
+
+## 환경 변수
+```
+다음 환경 변수가 필요합니다:
+
+DB_HOST
+DB_PORT
+DB_NAME
+DB_USER
+DB_PASS
+
+OPENAI_API_KEY
+UPSTAGE_API_KEY
+TAVILY_API_KEY
+
+LLM_PROVIDER
+LLM_PROVIDER_OPENAI_MODEL
+
+QDRANT_API_KEY
+QDRANT_URL
+
+GOOGLE_API_KEY
+GROQ_API_KEY
+```
+
+`.env` 파일 또는 OS 환경 변수로 설정할 수 있습니다.
+
+---
+
+## Docker / 배포 구조
+
+- 배포 환경: **Oracle Cloud(OCI)**
+- 백엔드 서비스와 Postgres는 **개별 Docker 이미지**로 실행
+- Woodpecker CI는 **Docker Compose** 기반 자동화된 빌드/배포 구성
+- Reverse Proxy 없이 FastAPI 서버 직접 운용
+
+---
+
+## 테스트
+
+테스트 코드는 `experiments/` 디렉토리 내에 위치하며, 다음 항목들을 중심으로 작성 중입니다.
+
+- LLM 클라이언트 초기화 테스트  
+- Multi-Agent Workflow 정상 동작 테스트  
+- 기술 지표 계산 및 데이터 정상성 테스트  
+- JSON 파싱 및 리포트 생성 테스트  
+
+(향후 pytest 기반 자동화 테스트 확장 예정)
+
+---
+
+## ⚠ 투자 유의사항
+
+본 분석 결과는 **AI 알고리즘 기반의 참고 자료**이며,  
+투자 권유나 종목 추천이 아닙니다.  
+
+과거 데이터와 통계를 기반으로 생성되므로  
+**미래 수익을 보장하지 않습니다.**  
+
+모든 투자 결정과 그에 따른 손익은  
+**투자자 본인의 책임**입니다.
+
+---
+
+## 문의 / 개발자 정보
+
+- 개발: 용신 ( 김태용, 신도희 )
+- 목적: 교육/연구/프로토타입 개발용
+- 문의: 프로젝트 이슈 탭 또는 개인 연락망
+
+---
