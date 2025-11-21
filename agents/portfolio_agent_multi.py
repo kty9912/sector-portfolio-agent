@@ -1026,27 +1026,37 @@ def _validate_chart_data(chart: Any, issues: List[str]):
                         issues.append(f"expected_performance_{label}_not_numeric_idx:{i}")
 
 
-def _validate_portfolio_items(final_portfolio: List[Dict[str, Any]], issues: List[str]):
-    for s in final_portfolio:
-        ticker = s.get("ticker")
-        w = s.get("weight")
-        try:
-            if w is None:
-                issues.append(f"portfolio_weight_missing:{ticker}")
-            else:
-                fw = float(w)
-                if fw <= 0 or fw > 1:
-                    issues.append(f"portfolio_weight_out_of_range:{ticker}:{fw}")
-        except Exception:
-            issues.append(f"portfolio_weight_not_numeric:{ticker}")
+def _validate_portfolio_items(stock: List[Dict[str, Any]], missing: List[str]):
+    expected_score_keys = {"data_analysis", "financial", "news"}
 
-        scores = s.get("scores")
-        if isinstance(scores, dict):
-            for k, v in scores.items():
-                try:
-                    float(v)
-                except Exception:
-                    issues.append(f"score_not_numeric:{ticker}:{k}")
+    ticker = stock.get("ticker")
+    w = stock.get("weight")
+    try:
+        if w is None:
+            missing.append(f"portfolio_weight_missing:{ticker}")
+        else:
+            fw = float(w)
+            if fw <= 0 or fw > 1:
+                missing.append(f"portfolio_weight_out_of_range:{ticker}:{fw}")
+    except Exception:
+        missing.append(f"portfolio_weight_not_numeric:{ticker}")
+    scores = stock.get("scores")
+    if isinstance(scores, dict):
+        # 누락/불필요/오타 키 검증
+        score_keys = set(scores.keys())
+        missing_keys = expected_score_keys - score_keys
+        if missing_keys:
+            print(f"[검증] {ticker} 종목: 필수 점수 키 누락 - {sorted(missing_keys)}")
+            missing.extend(sorted(missing_keys))
+        for k, v in scores.items():
+            try:
+                float(v)
+            except Exception:
+                print(f"[검증] {ticker} 종목: 점수 값이 숫자가 아님 - {k}:{v}")
+                missing.append(f"score_not_numeric:{ticker}:{k}")
+    else:
+        print(f"[검증] {ticker} 종목: scores가 없음 또는 dict가 아님!")
+        missing.append(f"scores_missing:{ticker}")
 
 
 
@@ -1062,8 +1072,8 @@ def validation_node(state: MultiAgentState) -> MultiAgentState:
     company_infos = state.get("company_infos", {})
     stock_prices = state.get("stock_prices", {})
 
-    required_keys = {"ticker", "name", "sector", "weight", "amount"}
-    optional_keys = {"shares", "current_price", "target_price", "stop_loss", "scores"}
+    required_keys = {"ticker", "name", "sector", "weight", "amount", "scores"}
+    optional_keys = {"shares", "current_price", "target_price", "stop_loss"}
     key_aliases = {
         "tickers": "ticker",
         "company": "name",
@@ -1110,6 +1120,7 @@ def validation_node(state: MultiAgentState) -> MultiAgentState:
                     issues.append(f"shares_calc_failed:{ticker}")
 
         missing = [k for k in required_keys if k not in stock or stock.get(k) in (None, "")]
+        _validate_portfolio_items(stock, missing)
         if missing:
             issues.append(f"missing_keys_for_{ticker}:{missing}")
 
@@ -1146,7 +1157,6 @@ def validation_node(state: MultiAgentState) -> MultiAgentState:
     # 추가 검증들
     _validate_performance_metrics(state.get("performance_metrics", {}), issues)
     _validate_chart_data(state.get("chart_data", {}), issues)
-    _validate_portfolio_items(final_portfolio, issues)
 
     # ✅ attempts는 여기서만 증가시키고, diff로 반환
     previous_attempts = int(state.get("validation_attempts", 0))
