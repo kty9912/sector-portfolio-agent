@@ -1,9 +1,25 @@
 steps:
+  test:
+    image: ghcr.io/astral-sh/uv:latest
+    pull: true
+    when:
+      event:
+        - push
+      branch:
+        - main
+
+    commands:
+      - echo "📦 Installing dependencies via uv..."
+      - uv sync  # pyproject.toml + uv.lock 기반 설치
+
+      - echo "🧪 Running tests..."
+      - uv run pytest -q   # uv 환경에서 pytest 실행
+
+
   deploy:
     image: docker:27
     pull: true
 
-    # 🔥 호스트 Docker 데몬 + .env 파일을 컨테이너로 마운트
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/opc/financial-strategy-agent/.env:/run/fin-agent.env:ro
@@ -17,22 +33,17 @@ steps:
     commands:
       - apk add --no-cache bash
 
-      - echo -e "\033[1;36m[DEBUG] Current directory\033[0m"
-      - pwd
-      - ls -al
-
       - echo -e "\033[1;34m[STEP]--------------------------------------------\033[0m"
       - echo -e "\033[1;34m[STEP] 배포 시작\033[0m"
 
       # 1. 기존 컨테이너 정리
-      - echo -e "\033[1;34m[STEP] 기존 컨테이너 중지 + 삭제\033[0m"
+      - echo -e "\033[1;34m[STEP] 기존 컨테이너 정지 + 삭제\033[0m"
       - docker stop fin-agent-app || true
       - docker rm fin-agent-app || true
-      - echo -e "\033[0;32m[INFO] 기존 컨테이너 정리 완료\033[0m"
 
       # 2. 이미지 빌드
       - echo -e "\033[1;34m[STEP] Docker 이미지 빌드 시작\033[0m"
-      - docker build -t fin-agent-app .
+      - docker build --no-cache -t fin-agent-app .
 
       # 3. 새 컨테이너 실행
       - echo -e "\033[1;34m[STEP] 새 컨테이너 실행\033[0m"

@@ -38,6 +38,7 @@ dependencies = [
     "langchain_groq",
     "langchain-tavily>=0.2.13",
     "setuptools>=80.9.0",
+    "pytest>=9.0.1",
 ]
 
 # 3. 개발용/선택적 의존성 (테스트, 린팅 등)
