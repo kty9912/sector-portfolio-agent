@@ -43,7 +43,7 @@ steps:
 
       # 2. 이미지 빌드
       - echo -e "\033[1;34m[STEP] Docker 이미지 빌드 시작\033[0m"
-      - docker build -t fin-agent-app .
+      - docker build --no-cache -t fin-agent-app .
 
       # 3. 새 컨테이너 실행
       - echo -e "\033[1;34m[STEP] 새 컨테이너 실행\033[0m"
