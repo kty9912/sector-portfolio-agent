@@ -5,25 +5,29 @@ from main import app
 client = TestClient(app)
 
 # GET 엔드포인트 테스트
-def test_get_sectors():
+def test_get_sectors(monkeypatch):
+    monkeypatch.setattr("main.app.dependency_overrides", {}, raising=False)
     response = client.get("/api/sectors")
     assert response.status_code == 200
     assert "sectors" in response.json()
 
 
-def test_get_stocks():
+def test_get_stocks(monkeypatch):
+    monkeypatch.setattr("main.app.dependency_overrides", {}, raising=False)
     response = client.get("/api/stocks")
     assert response.status_code == 200
     assert "stocks" in response.json()
 
 
-def test_get_models():
+def test_get_models(monkeypatch):
+    monkeypatch.setattr("main.app.dependency_overrides", {}, raising=False)
     response = client.get("/api/models")
     assert response.status_code == 200
     assert "models" in response.json()
 
 # 종목 정보 조회 테스트 (존재하지 않는 티커도 에러 없이 반환)
-def test_get_quick_info():
+def test_get_quick_info(monkeypatch):
+    monkeypatch.setattr("main.app.dependency_overrides", {}, raising=False)
     response = client.get("/api/quick-info/005930.KS")
     assert response.status_code == 200
     data = response.json()

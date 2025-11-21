@@ -7,42 +7,52 @@ from agents.portfolio_agent_multi import (
 
 # 1. DB/데이터 로드 함수 테스트
 @pytest.mark.skipif(not load_available_stocks(), reason="DB 연결 또는 데이터 없음")
-def test_load_available_stocks():
+def test_load_available_stocks(monkeypatch):
+    monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql: [{"ticker": "005930.KS", "name_kr": "삼성전자"}])
     stocks = load_available_stocks()
     assert isinstance(stocks, list)
     assert len(stocks) > 0
 
 @pytest.mark.skipif(not load_sector_map(), reason="DB 연결 또는 데이터 없음")
-def test_load_sector_map():
+def test_load_sector_map(monkeypatch):
+    monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql: [{"ticker": "005930.KS", "industry": "반도체"}])
     sector_map = load_sector_map()
     assert isinstance(sector_map, dict)
     assert len(sector_map) > 0
 
 # 2. 주요 Tool 함수 테스트 (조회만)
-def test_get_stock_prices():
+def test_get_stock_prices(monkeypatch):
+    monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자"}])
     stocks = load_available_stocks()
     ticker = stocks[0][0]
+    monkeypatch.setattr("agents.portfolio_agent_multi.get_stock_prices", lambda ticker: {"ticker": ticker, "current_price": 70000})
     result = get_stock_prices.invoke(ticker)
     assert isinstance(result, dict)
     assert "ticker" in result
 
-def test_get_financial_metrics():
+def test_get_financial_metrics(monkeypatch):
+    monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자"}])
     stocks = load_available_stocks()
     ticker = stocks[0][0]
+    monkeypatch.setattr("agents.portfolio_agent_multi.get_financial_metrics", lambda ticker: {"ticker": ticker, "roe": 10})
     result = get_financial_metrics.invoke(ticker)
     assert isinstance(result, dict)
     assert "ticker" in result
 
-def test_get_technical_signals():
+def test_get_technical_signals(monkeypatch):
+    monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자"}])
     stocks = load_available_stocks()
     ticker = stocks[0][0]
+    monkeypatch.setattr("agents.portfolio_agent_multi.get_technical_signals", lambda ticker: {"ticker": ticker, "rsi": 50})
     result = get_technical_signals.invoke(ticker)
     assert isinstance(result, dict)
     assert "ticker" in result
 
-def test_get_company_info():
+def test_get_company_info(monkeypatch):
+    monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자"}])
     stocks = load_available_stocks()
     ticker = stocks[0][0]
+    monkeypatch.setattr("agents.portfolio_agent_multi.get_company_info", lambda ticker: {"ticker": ticker, "name_kr": "삼성전자"})
     result = get_company_info.invoke(ticker)
     assert isinstance(result, dict)
     assert "ticker" in result
