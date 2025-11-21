@@ -305,22 +305,49 @@ def get_news_sentiment(ticker: str, company_name: str) -> Dict[str, Any]:
         from agents.tools import search_realtime_news_tavily, search_stock_news
 
         # Tavily를 사용하여 실시간 뉴스 검색
-        tavily_news = search_realtime_news_tavily.invoke({"query": company_name})
-        if type(tavily_news) == str:
+        tavily_raw = search_realtime_news_tavily.invoke({"query": company_name})
+
+        # Tavily 결과 타입 처리
+        if isinstance(tavily_raw, list):
+            tavily_news = tavily_raw
+        elif isinstance(tavily_raw, dict):
+            tavily_news = tavily_raw.get('results', [])
+        elif isinstance(tavily_raw, str):
             tavily_news = []
         else:
-            tavily_news = tavily_news.get('results', [])
-        qdrant_news = search_stock_news.invoke({"ticker": ticker, "company_name": company_name}).get('news', [])
+            tavily_news = []
+
+        # Qdrant 뉴스 검색
+        qdrant_result = search_stock_news.invoke({"ticker": ticker, "company_name": company_name})
+        qdrant_news = qdrant_result.get('news', []) if isinstance(qdrant_result, dict) else []
         
         all_news = tavily_news + qdrant_news
         news_list = []
-        
+
         for news in all_news:
+            if not isinstance(news, dict):
+                continue
+
+            title = news.get('title', news.get('content', '제목 없음'))
+            sentiment_score = news.get('sentiment_score', news.get('score', 0))
+
             news_list.append({
-                "title": news['title'],
-                "sentiment_score": news.get('sentiment_score', news.get('score', 0)),
+                "title": title,
+                "sentiment_score": sentiment_score,
             })
-        
+
+        # 뉴스가 없는 경우 기본값 반환
+        if not news_list:
+            return {
+                "ticker": ticker,
+                "company_name": company_name,
+                "news_count": 0,
+                "sentiment": "neutral",
+                "avg_sentiment_score": 0,
+                "articles": [],
+                "highlights": []
+            }
+
         # 평균 감성 점수
         avg_score = sum(n['sentiment_score'] for n in news_list) / len(news_list)
         

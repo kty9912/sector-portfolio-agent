@@ -167,20 +167,23 @@ def get_multiple_sectors_momentum(sector_names: List[str]) -> dict:
 @tool
 def search_realtime_news_tavily(query: str) -> List[Dict]:
     """
-    (Agent 5 - 단기 기억) Tavily를 사용해 '지금 이 순간'의 최신 뉴스를 
+    (Agent 5 - 단기 기억) Tavily를 사용해 '지금 이 순간'의 최신 뉴스를
     검색하고 요약합니다. "최신 속보"나 "오늘 동향"에 사용합니다.
     """
     print(f"\n[Agent 5 Tool - Tavily] 실시간 검색 시작. 쿼리: '{query}'")
     if not TAVILY_API_KEY:
         return [{"error": "TAVILY_API_KEY가 .env에 없습니다."}]
-    
+
     try:
-        tavily_tool = TavilySearch(max_results=10, 
+        tavily_tool = TavilySearch(max_results=10,
                                    tavily_api_key=TAVILY_API_KEY,
                                    topic="finance",
                                    time_range='month'
                                    )
         results = tavily_tool.invoke({'query': "{}의 최신 뉴스를 검색하고 요약합니다. '최신 속보'나 '오늘 동향'에 사용합니다.".format(query)})
+
+        # 결과 타입별 처리
+        items = []
         if isinstance(results, dict):
             if "results" in results:
                 items = results["results"]
@@ -191,23 +194,42 @@ def search_realtime_news_tavily(query: str) -> List[Dict]:
         elif isinstance(results, list):
             items = results
         elif isinstance(results, str):
-            # 예외적으로 문자열 반환 시 빈 리스트 처리
-            print(f"[Agent 5 Tool - Tavily] 문자열 결과: {results[:100]} ... 결과 무시하고 빈 리스트 반환")
-            items = []
+            # 문자열 반환 시 텍스트 정보로 변환
+            print(f"[Agent 5 Tool - Tavily] 문자열 결과 반환됨")
+            items = [{"title": "검색 요약", "content": results, "url": "", "score": 0.5}]
         else:
             # 기타 타입이면 빈 리스트 처리
             print(f"[Agent 5 Tool - Tavily] 예상치 못한 반환 타입: {type(results)}")
             items = []
 
-        # 리스트 타입 데이터에 대한 추가 처리
-        for item in items:
-            if isinstance(item, list):
-                print(f"⚠️ Tavily 결과가 리스트로 반환됨: {item}")
-                # 리스트를 문자열로 변환하거나 필요한 처리를 수행
-                item = " ".join(map(str, item))
+        # 각 항목이 딕셔너리인지 확인하고 정규화
+        normalized_items = []
+        for idx, item in enumerate(items):
+            if isinstance(item, dict):
+                normalized_items.append(item)
+            elif isinstance(item, str):
+                # 문자열 항목을 딕셔너리로 변환
+                normalized_items.append({
+                    "title": f"뉴스 {idx+1}",
+                    "content": item,
+                    "url": "",
+                    "score": 0.5
+                })
+            elif isinstance(item, list):
+                # 리스트 항목을 문자열로 변환 후 딕셔너리화
+                content = " ".join(map(str, item))
+                normalized_items.append({
+                    "title": f"뉴스 {idx+1}",
+                    "content": content,
+                    "url": "",
+                    "score": 0.5
+                })
+                print(f"⚠️ Tavily 결과가 리스트로 반환됨, 문자열로 변환")
+            else:
+                print(f"⚠️ 알 수 없는 항목 타입: {type(item)}")
 
-        print(f"[Agent 5 Tool - Tavily] 뉴스 개수: {len(items)}")
-        return items
+        print(f"[Agent 5 Tool - Tavily] 뉴스 개수: {len(normalized_items)}")
+        return normalized_items
 
     except Exception as e:
         print(f"[Agent 5 Tool - Tavily] 검색 실패: {str(e)}")

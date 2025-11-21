@@ -510,6 +510,15 @@ def get_news_analysis_for_portfolio(
             "tavily": tavily_result,
         }
 
+        # Tavily 결과 안전하게 처리
+        tavily_display = []
+        if isinstance(tavily_result, list):
+            tavily_display = tavily_result[:5]
+        elif isinstance(tavily_result, str):
+            tavily_display = [{"content": tavily_result}]
+        else:
+            tavily_display = [tavily_result] if tavily_result else []
+
         trend_prompt = f"""
         당신은 '{sector}' 섹터 뉴스 전문가입니다.
 
@@ -517,7 +526,7 @@ def get_news_analysis_for_portfolio(
         {json.dumps(qdrant_result.get('news', [])[:8], ensure_ascii=False, indent=2)}
 
         [최신 속보 (Tavily)]
-        {tavily_result[:5] if isinstance(tavily_result, list) else tavily_result}
+        {json.dumps(tavily_display, ensure_ascii=False, indent=2)}
 
         위 두 소스를 종합해, 투자자 관점에서 중요한 **산업 동향**을 3~5문장으로 한국어로 요약해줘.
         - 과거 트렌드 + 최신 이슈 모두 반영
@@ -544,7 +553,11 @@ def get_news_analysis_for_portfolio(
             "query": f"{company_name} 최신 뉴스",
         })
 
-        if "error" not in qdrant_stock or (isinstance(tavily_stock, list) and tavily_stock):
+        # 뉴스 데이터 유효성 검사
+        has_tavily_data = isinstance(tavily_stock, list) and len(tavily_stock) > 0
+        has_qdrant_data = isinstance(qdrant_stock, dict) and "news" in qdrant_stock and len(qdrant_stock.get("news", [])) > 0
+
+        if has_qdrant_data or has_tavily_data:
             stock_news[ticker] = {
                 "qdrant": qdrant_stock,
                 "tavily": tavily_stock,
@@ -557,8 +570,22 @@ def get_news_analysis_for_portfolio(
     ticker_scores: Dict[str, Any] = {}
 
     for ticker, news_data in stock_news.items():
-        qdrant_news = news_data.get("qdrant", {}).get("news", [])
-        tavily_news = news_data.get("tavily", []) if isinstance(news_data.get("tavily"), list) else []
+        # Qdrant 뉴스 안전하게 추출
+        qdrant_data = news_data.get("qdrant", {})
+        qdrant_news = qdrant_data.get("news", []) if isinstance(qdrant_data, dict) else []
+
+        # Tavily 뉴스 안전하게 추출
+        tavily_raw = news_data.get("tavily", [])
+        tavily_news = []
+        if isinstance(tavily_raw, list):
+            tavily_news = tavily_raw
+        elif isinstance(tavily_raw, str):
+            # 문자열인 경우 단일 항목으로 처리
+            tavily_news = [{"content": tavily_raw, "title": "검색 요약"}]
+        elif isinstance(tavily_raw, dict):
+            # 딕셔너리인 경우 리스트로 감싸기
+            tavily_news = [tavily_raw]
+
         company_name = news_data.get("company_name", ticker)
 
         if not qdrant_news and not tavily_news:
@@ -574,8 +601,12 @@ def get_news_analysis_for_portfolio(
             continue
 
         # Qdrant 쪽 감성
-        qdrant_sentiments = [item.get("sentiment", "neutral") for item in qdrant_news]
-        qdrant_scores = [item.get("sentiment_score", 0) for item in qdrant_news]
+        qdrant_sentiments = []
+        qdrant_scores = []
+        for item in qdrant_news:
+            if isinstance(item, dict):
+                qdrant_sentiments.append(item.get("sentiment", "neutral"))
+                qdrant_scores.append(item.get("sentiment_score", 0))
 
         # Tavily 쪽 감성 (LLM으로 분석)
         tavily_sentiments: List[str] = []
