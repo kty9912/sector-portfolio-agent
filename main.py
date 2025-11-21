@@ -15,7 +15,7 @@ import io
 from datetime import datetime
 import time
 
-from agents.portfolio_agent_anthropic import run_portfolio_agent, AVAILABLE_STOCKS, SECTORS
+from agents.portfolio_agent_anthropic import run_portfolio_agent, get_sectors as get_sectors_list, get_available_stocks
 from agents.portfolio_agent_multi import run_multi_agent_portfolio
 from agents.stock_agent_anthropic import run_stock_analysis_agent
 from agents.stock_agent_langgraph import run_langgraph_stock_analysis
@@ -86,7 +86,7 @@ async def stock():
 @app.get("/api/sectors")
 async def get_sectors():
     """사용 가능한 섹터 리스트"""
-    return {"sectors": SECTORS}
+    return {"sectors": get_sectors_list()}
 
 @app.get("/api/stocks")
 async def get_stocks():
@@ -94,7 +94,7 @@ async def get_stocks():
     return {
         "stocks": [
             {"ticker": ticker, "name": name}
-            for ticker, name in AVAILABLE_STOCKS
+            for ticker, name in get_available_stocks()
         ]
     }
 
@@ -162,10 +162,8 @@ async def analyze_anthropic(request: Request):
         if result["success"]:
             # 공통 파싱 함수 사용
             data = parse_agent_result(result, engine="anthropic")
-            
             # 차트 생성 및 데이터 추가
             data = _add_chart_data(data)
-            
             return JSONResponse(content={
                 "success": True,
                 "report": json.dumps(data, ensure_ascii=False),
@@ -174,7 +172,7 @@ async def analyze_anthropic(request: Request):
         else:
             # 에러 시에도 소요 시간 표시
             elapsed_time = time.time() - start_time
-            print(f"\n❌ 에러 발생 (소요 시간: {elapsed_time:.2f}초): {e}")
+            print(f"\n❌ 에러 발생 (소요 시간: {elapsed_time:.2f}초): {result.get('error', '알 수 없는 오류')}")
             raise HTTPException(status_code=500, detail=result.get("error", "알 수 없는 오류"))
     
     except Exception as e:

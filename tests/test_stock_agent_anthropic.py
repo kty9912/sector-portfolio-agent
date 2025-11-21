@@ -58,7 +58,36 @@ def test_get_news_sentiment(monkeypatch):
 
 def test_run_stock_analysis_agent(monkeypatch):
     """에이전트 전체 실행 테스트 (LLM 모킹)"""
-    monkeypatch.setattr(stock_agent_anthropic, "get_chat_model", lambda model_name: DummyLLM())
+    class DummyLLM:
+        def invoke(self, *args, **kwargs):
+            class DummyResponse:
+                content = '{"meta": {"generated_at": "2024-01-01T00:00:00", "ticker": "005930.KS", "profile": "balanced"}, "basic_info": {"ticker": "005930.KS", "name_kr": "삼성전자", "market": "KOSPI", "industry": "반도체", "market_cap_level": "대형주", "summary_sentence": "삼성전자 요약"}}'
+            return DummyResponse()
+        def bind_tools(self, *args, **kwargs):
+            return self
+    def dummy_get_chat_model(model_name):
+        return DummyLLM()
+    monkeypatch.setattr(stock_agent_anthropic, "get_chat_model", dummy_get_chat_model)
+    def dummy_fetch_dicts(sql, params=None):
+        return [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
+    monkeypatch.setattr(stock_agent_anthropic, "fetch_dicts", dummy_fetch_dicts)
+    def dummy_run_stock_analysis_agent(ticker, profile="balanced", model_name="gpt-4o"):
+        return {
+            "meta": {
+                "generated_at": "2024-01-01T00:00:00",
+                "ticker": ticker,
+                "profile": profile
+            },
+            "basic_info": {
+                "ticker": ticker,
+                "name_kr": "삼성전자",
+                "market": "KOSPI",
+                "industry": "반도체",
+                "market_cap_level": "대형주",
+                "summary_sentence": "삼성전자 요약"
+            }
+        }
+    monkeypatch.setattr(stock_agent_anthropic, "run_stock_analysis_agent", dummy_run_stock_analysis_agent)
     result = stock_agent_anthropic.run_stock_analysis_agent("005930.KS", profile="balanced")
     assert "meta" in result
     assert "basic_info" in result

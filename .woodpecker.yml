@@ -1,21 +1,28 @@
 steps:
+  # 1) 테스트 단계 (uv + pytest)
   test:
-    image: ghcr.io/astral-sh/uv:latest
+    image: python:3.11-slim
     pull: true
+
     when:
       event:
         - push
       branch:
         - main
+    
+    environment:
+      CI: "true"
 
     commands:
-      - echo "📦 Installing dependencies via uv..."
-      - uv sync  # pyproject.toml + uv.lock 기반 설치
+      - echo "📦 Installing uv & dependencies..."
+      - python -m pip install --upgrade pip
+      - pip install uv
+      # pyproject.toml + uv.lock 기반으로 의존성 설치
+      - uv sync --frozen
+      - echo "🧪 Running tests with pytest..."
+      - uv run pytest -q
 
-      - echo "🧪 Running tests..."
-      - uv run pytest -q   # uv 환경에서 pytest 실행
-
-
+  # 2) 배포 단계 (테스트 통과 후에만 실행됨)
   deploy:
     image: docker:27
     pull: true
@@ -30,8 +37,16 @@ steps:
       branch:
         - main
 
+    # test 스텝이 성공해야만 이 스텝이 실행됨
+    depends_on:
+      - test
+
     commands:
       - apk add --no-cache bash
+
+      - echo -e "\033[1;36m[DEBUG] Current directory\033[0m"
+      - pwd
+      - ls -al
 
       - echo -e "\033[1;34m[STEP]--------------------------------------------\033[0m"
       - echo -e "\033[1;34m[STEP] 배포 시작\033[0m"
@@ -40,10 +55,15 @@ steps:
       - echo -e "\033[1;34m[STEP] 기존 컨테이너 정지 + 삭제\033[0m"
       - docker stop fin-agent-app || true
       - docker rm fin-agent-app || true
+      - echo -e "\033[0;32m[INFO] 기존 컨테이너 정리 완료\033[0m"
+
+      # (선택) 빌드 캐시 날리고 싶으면 아래 두 줄 활성화
+      # - docker builder prune -af || true
+      # - docker image prune -af || true
 
       # 2. 이미지 빌드
       - echo -e "\033[1;34m[STEP] Docker 이미지 빌드 시작\033[0m"
-      - docker build --no-cache -t fin-agent-app .
+      - docker build -t fin-agent-app .
 
       # 3. 새 컨테이너 실행
       - echo -e "\033[1;34m[STEP] 새 컨테이너 실행\033[0m"

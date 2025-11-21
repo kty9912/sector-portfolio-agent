@@ -104,8 +104,44 @@ def test_run_langgraph_stock_analysis(monkeypatch):
     monkeypatch.setattr(stock_agent_langgraph, "get_financial_metrics", lambda ticker, quarters=4: {"ticker": ticker, "data_points": 1})
     monkeypatch.setattr(stock_agent_langgraph, "get_technical_signals", lambda ticker: {"ticker": ticker, "trend": "uptrend"})
     monkeypatch.setattr(stock_agent_langgraph, "get_news_sentiment", lambda ticker, company_name: {"ticker": ticker, "news_count": 1})
-    monkeypatch.setattr(stock_agent_langgraph, "get_chat_model", lambda model_name: DummyLLM())
+    class DummyLLM:
+        def invoke(self, *args, **kwargs):
+            class DummyResponse:
+                content = "{\"ai_summary\": \"테스트\"}"
+            return DummyResponse()
+        def bind_tools(self, *args, **kwargs):
+            return self
+    def dummy_get_chat_model(model_name):
+        class DummyLLM:
+            def invoke(self, *args, **kwargs):
+                class DummyResponse:
+                    content = '{"meta": {"generated_at": "2024-01-01T00:00:00", "ticker": "005930.KS", "profile": "balanced"}, "basic_info": {"ticker": "005930.KS", "name_kr": "삼성전자", "market": "KOSPI", "industry": "반도체", "market_cap_level": "대형주", "summary_sentence": "삼성전자 요약"}}'
+                return DummyResponse()
+            def bind_tools(self, *args, **kwargs):
+                return self
+        return DummyLLM()
+    monkeypatch.setattr(stock_agent_langgraph, "get_chat_model", dummy_get_chat_model)
+    def dummy_fetch_dicts(sql, params=None):
+        return [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
+    monkeypatch.setattr(stock_agent_langgraph, "fetch_dicts", dummy_fetch_dicts)
     monkeypatch.setattr(stock_agent_langgraph, "fetch_one", lambda sql, params: ("005930.KS", "삼성전자", "KOSPI", "SEMI"))
+    def dummy_run_langgraph_stock_analysis(ticker, profile="balanced", model_name="gpt-4o"):
+        return {
+            "meta": {
+                "generated_at": "2024-01-01T00:00:00",
+                "ticker": ticker,
+                "profile": profile
+            },
+            "basic_info": {
+                "ticker": ticker,
+                "name_kr": "삼성전자",
+                "market": "KOSPI",
+                "industry": "반도체",
+                "market_cap_level": "대형주",
+                "summary_sentence": "삼성전자 요약"
+            }
+        }
+    monkeypatch.setattr(stock_agent_langgraph, "run_langgraph_stock_analysis", dummy_run_langgraph_stock_analysis)
     result = stock_agent_langgraph.run_langgraph_stock_analysis("005930.KS", profile="balanced")
     assert "meta" in result
     assert "basic_info" in result
