@@ -6,14 +6,12 @@ from agents.portfolio_agent_multi import (
 )
 
 # 1. DB/데이터 로드 함수 테스트
-@pytest.mark.skipif(not load_available_stocks(), reason="DB 연결 또는 데이터 없음")
 def test_load_available_stocks(monkeypatch):
     monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql: [{"ticker": "005930.KS", "name_kr": "삼성전자"}])
     stocks = get_available_stocks()
     assert isinstance(stocks, list)
     assert len(stocks) > 0
 
-@pytest.mark.skipif(not load_sector_map(), reason="DB 연결 또는 데이터 없음")
 def test_load_sector_map(monkeypatch):
     monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql: [{"ticker": "005930.KS", "industry": "반도체"}])
     sector_map = get_sector_map()
