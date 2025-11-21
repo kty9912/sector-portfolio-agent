@@ -56,10 +56,16 @@ def load_sectors() -> List[str]:
                 sectors_set.add(sector_kr)
     return sorted(list(sectors_set))
 
-# 초기 로드
-AVAILABLE_STOCKS = load_available_stocks()
-SECTOR_MAP = load_sector_map()
-SECTORS = load_sectors()
+
+# DB 의존 변수는 함수로 변경
+def get_available_stocks():
+    return load_available_stocks()
+
+def get_sector_map():
+    return load_sector_map()
+
+def get_sectors():
+    return load_sectors()
 
 
 INDUSTRY_TRENDS = {
@@ -378,7 +384,7 @@ def get_stocks_by_sector(sectors: List[str]) -> Dict[str, Any]:
     """섹터별 종목 조회"""
     result = {}
     for sector in sectors:
-        stocks = [(ticker, name) for ticker, name in AVAILABLE_STOCKS if SECTOR_MAP.get(ticker) == sector]
+        stocks = [(ticker, name) for ticker, name in get_available_stocks() if get_sector_map().get(ticker) == sector]
         result[sector] = [{"ticker": t, "name": n} for t, n in stocks]
     
     return {"sector_stocks": result}

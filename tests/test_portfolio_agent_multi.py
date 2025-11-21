@@ -1,6 +1,6 @@
 import pytest
 from agents.portfolio_agent_multi import (
-    load_available_stocks, load_sector_map,
+    load_available_stocks, load_sector_map, get_available_stocks, get_sector_map,
     get_stock_prices, get_financial_metrics, get_technical_signals, get_company_info,
     parse_llm_json, run_multi_agent_portfolio
 )
@@ -9,14 +9,14 @@ from agents.portfolio_agent_multi import (
 @pytest.mark.skipif(not load_available_stocks(), reason="DB 연결 또는 데이터 없음")
 def test_load_available_stocks(monkeypatch):
     monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql: [{"ticker": "005930.KS", "name_kr": "삼성전자"}])
-    stocks = load_available_stocks()
+    stocks = get_available_stocks()
     assert isinstance(stocks, list)
     assert len(stocks) > 0
 
 @pytest.mark.skipif(not load_sector_map(), reason="DB 연결 또는 데이터 없음")
 def test_load_sector_map(monkeypatch):
     monkeypatch.setattr("agents.portfolio_agent_multi.fetch_dicts", lambda sql: [{"ticker": "005930.KS", "industry": "반도체"}])
-    sector_map = load_sector_map()
+    sector_map = get_sector_map()
     assert isinstance(sector_map, dict)
     assert len(sector_map) > 0
 

@@ -15,7 +15,7 @@ import io
 from datetime import datetime
 import time
 
-from agents.portfolio_agent_anthropic import run_portfolio_agent, AVAILABLE_STOCKS, SECTORS
+from agents.portfolio_agent_anthropic import run_portfolio_agent, get_sectors as get_sectors_list, get_available_stocks
 from agents.portfolio_agent_multi import run_multi_agent_portfolio
 from agents.stock_agent_anthropic import run_stock_analysis_agent
 from agents.stock_agent_langgraph import run_langgraph_stock_analysis
@@ -86,7 +86,7 @@ async def stock():
 @app.get("/api/sectors")
 async def get_sectors():
     """사용 가능한 섹터 리스트"""
-    return {"sectors": SECTORS}
+    return {"sectors": get_sectors_list()}
 
 @app.get("/api/stocks")
 async def get_stocks():
@@ -94,7 +94,7 @@ async def get_stocks():
     return {
         "stocks": [
             {"ticker": ticker, "name": name}
-            for ticker, name in AVAILABLE_STOCKS
+            for ticker, name in get_available_stocks()
         ]
     }
 

@@ -96,8 +96,11 @@ def load_sector_map() -> Dict[str, str]:
     return sector_map
 
 
-AVAILABLE_STOCKS = load_available_stocks()
-SECTOR_MAP = load_sector_map()
+def get_available_stocks():
+    return load_available_stocks()
+
+def get_sector_map():
+    return load_sector_map()
 
 
 def parse_llm_json(raw_text: str) -> Dict[str, Any]:
@@ -310,7 +313,7 @@ def initialization_node(state: MultiAgentState) -> MultiAgentState:
     # 섹터별 종목 수집
     if sectors:
         for sector in sectors:
-            sector_tickers = [t for t, s in SECTOR_MAP.items() if s == sector]
+            sector_tickers = [t for t, s in get_sector_map().items() if s == sector]
             tickers.update(sector_tickers)
     
     # 직접 선택한 종목 추가
@@ -436,21 +439,13 @@ def financial_agent_node(state: MultiAgentState) -> MultiAgentState:
     
     # JSON 파싱
     try:
-        json_start = response_text.find("```json")
-        json_end = response_text.find("```", json_start + 7)
-        
-        if json_start != -1 and json_end != -1:
-            json_str = response_text[json_start+7:json_end].strip()
-        else:
-            json_str = response_text
-        
-        financial_analysis = json.loads(json_str)
+        financial_analysis = parse_llm_json(response_text)
         print(f"\n✅ 재무 분석 완료")
         print(f"  - 분석 종목: {len(financial_analysis.get('ticker_scores', {}))}개")
         print(f"  - Top Picks: {financial_analysis.get('top_picks', [])}")
-        
-    except json.JSONDecodeError as e:
-        print(f"⚠️ JSON 파싱 오류: {e}")
+    except Exception as e:
+        print(f"⚠️ JSON 파싱 오류: {e}")    
+        print(f"LLM 응답 원문: {response_text}")
         financial_analysis = {
             "analysis_summary": "재무 분석 파싱 실패",
             "ticker_scores": {},

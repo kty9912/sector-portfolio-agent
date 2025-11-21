@@ -1,6 +1,4 @@
 import pytest
-import pytest
-from core.db import healthcheck, fetch_one, exec_sql
 from core.db import healthcheck, fetch_one, exec_sql
 
 def test_healthcheck(monkeypatch):

@@ -10,6 +10,8 @@ def test_get_sectors(monkeypatch):
     response = client.get("/api/sectors")
     assert response.status_code == 200
     assert "sectors" in response.json()
+    from agents.portfolio_agent_anthropic import get_sectors
+    assert response.json()["sectors"] == get_sectors()
 
 
 def test_get_stocks(monkeypatch):
