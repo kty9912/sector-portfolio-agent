@@ -6,7 +6,8 @@ client = TestClient(app)
 
 # GET 엔드포인트 테스트
 def test_get_sectors(monkeypatch):
-    monkeypatch.setattr("main.app.dependency_overrides", {}, raising=False)
+    import agents.portfolio_agent_anthropic as pa
+    pa.fetch_dicts = lambda sql, params=None: [{"industry": "반도체"}]
     response = client.get("/api/sectors")
     assert response.status_code == 200
     assert "sectors" in response.json()
@@ -15,7 +16,8 @@ def test_get_sectors(monkeypatch):
 
 
 def test_get_stocks(monkeypatch):
-    monkeypatch.setattr("main.app.dependency_overrides", {}, raising=False)
+    import agents.portfolio_agent_anthropic as pa
+    pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자"}]
     response = client.get("/api/stocks")
     assert response.status_code == 200
     assert "stocks" in response.json()
