@@ -46,6 +46,7 @@ def test_analyze_anthropic(monkeypatch):
     import agents.portfolio_agent_anthropic as pa
     pa.run_portfolio_agent = lambda **kwargs: {"success": True, "final_report": "{\"ai_summary\": \"테스트\"}"}
     pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
+    pa.get_chat_model = lambda model_name: type("DummyLLM", (), {"invoke": lambda self, *args, **kwargs: type("DummyResponse", (), {"content": "{\"ai_summary\": \"테스트\"}"})()})()
     payload = {
         "budget": 1000000,
         "investment_targets": {"sectors": ["반도체"], "tickers": ["005930.KS"]},
@@ -68,6 +69,7 @@ def test_analyze_stock_anthropic(monkeypatch):
     sa.run_stock_analysis_agent = lambda **kwargs: {"basic_info": {"name_kr": "삼성전자"}, "ai_summary": "테스트"}
     import agents.portfolio_agent_anthropic as pa
     pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
+    pa.get_chat_model = lambda model_name: type("DummyLLM", (), {"invoke": lambda self, *args, **kwargs: type("DummyResponse", (), {"content": "{\"ai_summary\": \"테스트\"}"})()})()
     payload = {"ticker": "005930.KS", "profile": "balanced", "model_name": "gpt-4o"}
     response = client.post("/api/stock/anthropic", json=payload)
     assert response.status_code == 200
@@ -80,6 +82,7 @@ def test_analyze_stock_langgraph(monkeypatch):
     sl.run_langgraph_stock_analysis = lambda **kwargs: {"basic_info": {"name_kr": "삼성전자"}, "ai_summary": "테스트"}
     import agents.portfolio_agent_anthropic as pa
     pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
+    pa.get_chat_model = lambda model_name: type("DummyLLM", (), {"invoke": lambda self, *args, **kwargs: type("DummyResponse", (), {"content": "{\"ai_summary\": \"테스트\"}"})()})()
     payload = {"ticker": "005930.KS", "profile": "balanced", "model_name": "gpt-4o"}
     response = client.post("/api/stock/langgraph", json=payload)
     assert response.status_code == 200

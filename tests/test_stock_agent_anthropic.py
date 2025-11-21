@@ -58,7 +58,7 @@ def test_get_news_sentiment(monkeypatch):
 
 def test_run_stock_analysis_agent(monkeypatch):
     """에이전트 전체 실행 테스트 (LLM 모킹)"""
-    monkeypatch.setattr(stock_agent_anthropic, "get_chat_model", lambda model_name: DummyLLM())
+    monkeypatch.setattr(stock_agent_anthropic, "get_chat_model", lambda model_name: DummyLLM)
     result = stock_agent_anthropic.run_stock_analysis_agent("005930.KS", profile="balanced")
     assert "meta" in result
     assert "basic_info" in result

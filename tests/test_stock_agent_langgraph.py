@@ -104,7 +104,7 @@ def test_run_langgraph_stock_analysis(monkeypatch):
     monkeypatch.setattr(stock_agent_langgraph, "get_financial_metrics", lambda ticker, quarters=4: {"ticker": ticker, "data_points": 1})
     monkeypatch.setattr(stock_agent_langgraph, "get_technical_signals", lambda ticker: {"ticker": ticker, "trend": "uptrend"})
     monkeypatch.setattr(stock_agent_langgraph, "get_news_sentiment", lambda ticker, company_name: {"ticker": ticker, "news_count": 1})
-    monkeypatch.setattr(stock_agent_langgraph, "get_chat_model", lambda model_name: DummyLLM())
+    monkeypatch.setattr(stock_agent_langgraph, "get_chat_model", lambda model_name: DummyLLM)
     monkeypatch.setattr(stock_agent_langgraph, "fetch_one", lambda sql, params: ("005930.KS", "삼성전자", "KOSPI", "SEMI"))
     result = stock_agent_langgraph.run_langgraph_stock_analysis("005930.KS", profile="balanced")
     assert "meta" in result
