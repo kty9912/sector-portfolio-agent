@@ -31,7 +31,8 @@ def test_get_models(monkeypatch):
 
 # 종목 정보 조회 테스트 (존재하지 않는 티커도 에러 없이 반환)
 def test_get_quick_info(monkeypatch):
-    monkeypatch.setattr("main.app.dependency_overrides", {}, raising=False)
+    import agents.portfolio_agent_anthropic as pa
+    pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
     response = client.get("/api/quick-info/005930.KS")
     assert response.status_code == 200
     data = response.json()
@@ -42,7 +43,9 @@ def test_get_quick_info(monkeypatch):
 import agents.portfolio_agent_anthropic
 def test_analyze_anthropic(monkeypatch):
     # Agent 함수 모킹
-    monkeypatch.setattr(agents.portfolio_agent_anthropic, "run_portfolio_agent", lambda **kwargs: {"success": True, "final_report": "{\"ai_summary\": \"테스트\"}"})
+    import agents.portfolio_agent_anthropic as pa
+    pa.run_portfolio_agent = lambda **kwargs: {"success": True, "final_report": "{\"ai_summary\": \"테스트\"}"}
+    pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
     payload = {
         "budget": 1000000,
         "investment_targets": {"sectors": ["반도체"], "tickers": ["005930.KS"]},
@@ -61,7 +64,10 @@ def test_analyze_anthropic(monkeypatch):
 import agents.stock_agent_anthropic
 def test_analyze_stock_anthropic(monkeypatch):
     # 실제 반환 구조에 맞게 모킹
-    monkeypatch.setattr(agents.stock_agent_anthropic, "run_stock_analysis_agent", lambda **kwargs: {"basic_info": {"name_kr": "삼성전자"}, "ai_summary": "테스트"})
+    import agents.stock_agent_anthropic as sa
+    sa.run_stock_analysis_agent = lambda **kwargs: {"basic_info": {"name_kr": "삼성전자"}, "ai_summary": "테스트"}
+    import agents.portfolio_agent_anthropic as pa
+    pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
     payload = {"ticker": "005930.KS", "profile": "balanced", "model_name": "gpt-4o"}
     response = client.post("/api/stock/anthropic", json=payload)
     assert response.status_code == 200
@@ -70,7 +76,10 @@ def test_analyze_stock_anthropic(monkeypatch):
 
 import agents.stock_agent_langgraph
 def test_analyze_stock_langgraph(monkeypatch):
-    monkeypatch.setattr(agents.stock_agent_langgraph, "run_langgraph_stock_analysis", lambda **kwargs: {"basic_info": {"name_kr": "삼성전자"}, "ai_summary": "테스트"})
+    import agents.stock_agent_langgraph as sl
+    sl.run_langgraph_stock_analysis = lambda **kwargs: {"basic_info": {"name_kr": "삼성전자"}, "ai_summary": "테스트"}
+    import agents.portfolio_agent_anthropic as pa
+    pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
     payload = {"ticker": "005930.KS", "profile": "balanced", "model_name": "gpt-4o"}
     response = client.post("/api/stock/langgraph", json=payload)
     assert response.status_code == 200
