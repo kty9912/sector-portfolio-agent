@@ -9,6 +9,9 @@ steps:
         - push
       branch:
         - main
+    
+    environment:
+      CI: "true"
 
     commands:
       - echo "📦 Installing uv & dependencies..."

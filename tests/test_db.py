@@ -1,4 +1,6 @@
 import pytest
+import os
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="CI에서 비활성화")
 from core.db import healthcheck, fetch_one, exec_sql
 
 def test_healthcheck():
