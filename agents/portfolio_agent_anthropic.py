@@ -966,7 +966,7 @@ def run_portfolio_agent(
         
         if not has_tool_calls:
             print("\n✅ Agent 분석 완료")
-            final_content = response.content if isinstance(response.content, str) else str(response.content)
+            final_content = extract_content_text(response.content)
             
             # ⭐ JSON 검증 함수 호출
             print("\n🔍 JSON 검증 중...")
