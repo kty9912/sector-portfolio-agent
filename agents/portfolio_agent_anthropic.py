@@ -179,6 +179,23 @@ def to_float(val) -> float:
     return float(val) if isinstance(val, Decimal) else val
 
 
+def extract_content_text(content) -> str:
+    """LLM 응답의 content를 안전하게 문자열로 변환"""
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        # list인 경우 text 타입의 content만 추출하여 결합
+        text_parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                text_parts.append(item.get("text", ""))
+            elif isinstance(item, str):
+                text_parts.append(item)
+        return "".join(text_parts)
+    else:
+        return str(content)
+
+
 def get_stock_prices(ticker: str, days: int = 250) -> Dict[str, Any]:
     """주가 데이터 조회"""
     cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -517,7 +534,7 @@ def get_news_analysis_for_portfolio(
         - 투자 포인트/리스크를 함께 언급
         """
         trend_response = llm.invoke([HumanMessage(content=trend_prompt)])
-        sector_trends[sector] = trend_response.content.strip()
+        sector_trends[sector] = extract_content_text(trend_response.content).strip()
 
     # ============================================
     # 2단계: 종목별 뉴스 수집 (상위 10개)
@@ -595,7 +612,7 @@ def get_news_analysis_for_portfolio(
             """
             try:
                 tavily_sentiment_response = llm.invoke([HumanMessage(content=tavily_prompt)])
-                tavily_text = tavily_sentiment_response.content
+                tavily_text = extract_content_text(tavily_sentiment_response.content)
 
                 json_start = tavily_text.find("{")
                 json_end = tavily_text.rfind("}") + 1
@@ -677,7 +694,7 @@ def get_news_analysis_for_portfolio(
     - 문자열은 큰따옴표(")만 사용
     """
     final_response = llm.invoke([HumanMessage(content=final_prompt)])
-    text = final_response.content
+    text = extract_content_text(final_response.content)
 
     try:
         json_start = text.find("{")
@@ -949,7 +966,7 @@ def run_portfolio_agent(
         
         if not has_tool_calls:
             print("\n✅ Agent 분석 완료")
-            final_content = response.content if isinstance(response.content, str) else str(response.content)
+            final_content = extract_content_text(response.content)
             
             # ⭐ JSON 검증 함수 호출
             print("\n🔍 JSON 검증 중...")

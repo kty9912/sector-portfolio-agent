@@ -39,6 +39,8 @@ RUN uv sync --frozen --no-dev
 # ====== FINAL STAGE ======
 FROM python:3.11-slim AS final
 
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # 런타임 필요한 패키지 + Playwright chromium 의존성
