@@ -64,6 +64,9 @@ def test_get_company_info(monkeypatch):
 # 3. JSON 검증 함수 테스트
 def test_validate_portfolio_json_valid():
     json_str = '{"portfolio_allocation": [{"ticker": "005930.KS", "name": "삼성전자", "sector": "반도체"}]}'
+    import agents.portfolio_agent_anthropic as pa
+    # get_company_info monkeypatch
+    pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
     result = validate_portfolio_json(json_str)
     assert isinstance(result, dict)
     assert "portfolio_allocation" in result
@@ -75,6 +78,8 @@ def test_validate_portfolio_json_invalid():
 
 # 4. 뉴스 분석 함수 테스트 (smoke)
 def test_get_news_analysis_for_portfolio_smoke():
+    import agents.portfolio_agent_anthropic as pa
+    pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자"}]
     stocks = load_available_stocks()
     tickers = [stocks[0][0]]
     sectors = [load_sector_map()[tickers[0]]] if tickers else []
@@ -107,6 +112,8 @@ def test_get_news_analysis_for_portfolio_smoke():
 
 # 5. Tool 라우터 테스트
 def test_execute_tool_get_stock_prices():
+    import agents.portfolio_agent_anthropic as pa
+    pa.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자"}]
     stocks = load_available_stocks()
     ticker = stocks[0][0]
     result = execute_tool("get_stock_prices", {"ticker": ticker})

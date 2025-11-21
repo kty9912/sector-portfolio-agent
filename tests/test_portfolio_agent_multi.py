@@ -83,6 +83,8 @@ def test_run_multi_agent_portfolio_smoke(monkeypatch):
                 return DummyResponse()
         return DummyLLM()
     monkeypatch.setattr(portfolio_agent_multi, "get_chat_model", mock_get_chat_model)
+    import agents.portfolio_agent_multi as pm
+    pm.fetch_dicts = lambda sql, params=None: [{"ticker": "005930.KS", "name_kr": "삼성전자", "industry": "반도체"}]
     result = run_multi_agent_portfolio(
         budget=1000000,
         investment_targets={"sectors": ["반도체"], "tickers": []},
