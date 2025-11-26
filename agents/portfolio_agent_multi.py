@@ -1228,6 +1228,9 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
             "sector": info.get("sector")  # DB의 정확한 섹터명
         }
     
+    # 종목별 주가 데이터
+    technical_data = state.get("stock_prices", {})
+    
     # ⭐ 디버깅: supervisor 실행 횟수 추적
     current_history = state.get("discussion_history", [])
     print(f"\n [Supervisor 디버깅] discussion_history 개수: {len(current_history)}")
@@ -1252,6 +1255,9 @@ def supervisor_node(state: MultiAgentState) -> MultiAgentState:
 
 **⚠️ 중요: 종목-섹터 매핑 (반드시 이 섹터명을 사용)**
 {json.dumps(ticker_sector_map, ensure_ascii=False, indent=2)}
+
+**⚠️ 중요: 종목-주가 매핑 (반드시 현재 주가를 기준으로 목표가와 손절가 계산)**
+{json.dumps(technical_data, ensure_ascii=False, indent=2)}
 
 **전문가 분석 결과:**
 
