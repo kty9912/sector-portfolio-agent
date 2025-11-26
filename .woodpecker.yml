@@ -20,7 +20,7 @@ steps:
       # pyproject.toml + uv.lock 기반으로 의존성 설치
       - uv sync --frozen
       - echo "🧪 Running tests with pytest..."
-      - uv run pytest -q
+      - uv run pytest -q -s
 
   # 2) 배포 단계 (테스트 통과 후에만 실행됨)
   deploy:
